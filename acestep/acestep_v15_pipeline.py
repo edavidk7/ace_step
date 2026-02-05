@@ -5,23 +5,23 @@ Handler wrapper connecting model and UI
 import os
 import sys
 
-# Load environment variables from .env file in project root
-# This allows configuration without hardcoding values
-# Falls back to .env.example if .env is not found
+# Load environment variables from .env file at most once per process to avoid
+# epoch-boundary stalls (e.g. on Windows when Gradio yields during training)
+_env_loaded = False  # module-level so we never reload .env in the same process
 try:
     from dotenv import load_dotenv
-    # Get project root directory
-    _current_file = os.path.abspath(__file__)
-    _project_root = os.path.dirname(os.path.dirname(_current_file))
-    _env_path = os.path.join(_project_root, '.env')
-    _env_example_path = os.path.join(_project_root, '.env.example')
-    
-    if os.path.exists(_env_path):
-        load_dotenv(_env_path)
-        print(f"Loaded configuration from {_env_path}")
-    elif os.path.exists(_env_example_path):
-        load_dotenv(_env_example_path)
-        print(f"Loaded configuration from {_env_example_path} (fallback)")
+    if not _env_loaded:
+        _current_file = os.path.abspath(__file__)
+        _project_root = os.path.dirname(os.path.dirname(_current_file))
+        _env_path = os.path.join(_project_root, '.env')
+        _env_example_path = os.path.join(_project_root, '.env.example')
+        if os.path.exists(_env_path):
+            load_dotenv(_env_path)
+            print(f"Loaded configuration from {_env_path}")
+        elif os.path.exists(_env_example_path):
+            load_dotenv(_env_example_path)
+            print(f"Loaded configuration from {_env_example_path} (fallback)")
+        _env_loaded = True
 except ImportError:
     # python-dotenv not installed, skip loading .env
     pass

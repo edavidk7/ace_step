@@ -695,14 +695,20 @@ def _get_model_name(config_path: str) -> str:
     return os.path.basename(normalized)
 
 
+_project_env_loaded = False
+
+
 def _load_project_env() -> None:
-    if load_dotenv is None:
+    """Load .env at most once per process to avoid epoch-boundary stalls (e.g. Windows LoRA training)."""
+    global _project_env_loaded
+    if _project_env_loaded or load_dotenv is None:
         return
     try:
         project_root = _get_project_root()
         env_path = os.path.join(project_root, ".env")
         if os.path.exists(env_path):
             load_dotenv(env_path, override=False)
+        _project_env_loaded = True
     except Exception:
         # Optional best-effort: continue even if .env loading fails.
         pass
