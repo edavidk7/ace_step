@@ -100,6 +100,7 @@ DEFAULT_REPO_ID = "ACE-Step/Ace-Step1.5"
 def _can_access_google(timeout: float = 3.0) -> bool:
     """Check if Google is accessible (to determine HuggingFace vs ModelScope)."""
     import socket
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         sock.settimeout(timeout)
@@ -119,11 +120,15 @@ def _download_from_huggingface(repo_id: str, local_dir: str, model_name: str) ->
 
     if is_unified_repo:
         download_dir = local_dir
-        print(f"[Model Download] Downloading unified repo {repo_id} to {download_dir}...")
+        print(
+            f"[Model Download] Downloading unified repo {repo_id} to {download_dir}..."
+        )
     else:
         download_dir = os.path.join(local_dir, model_name)
         os.makedirs(download_dir, exist_ok=True)
-        print(f"[Model Download] Downloading {model_name} from {repo_id} to {download_dir}...")
+        print(
+            f"[Model Download] Downloading {model_name} from {repo_id} to {download_dir}..."
+        )
 
     snapshot_download(
         repo_id=repo_id,
@@ -142,11 +147,15 @@ def _download_from_modelscope(repo_id: str, local_dir: str, model_name: str) -> 
 
     if is_unified_repo:
         download_dir = local_dir
-        print(f"[Model Download] Downloading unified repo {repo_id} from ModelScope to {download_dir}...")
+        print(
+            f"[Model Download] Downloading unified repo {repo_id} from ModelScope to {download_dir}..."
+        )
     else:
         download_dir = os.path.join(local_dir, model_name)
         os.makedirs(download_dir, exist_ok=True)
-        print(f"[Model Download] Downloading {model_name} from ModelScope {repo_id} to {download_dir}...")
+        print(
+            f"[Model Download] Downloading {model_name} from ModelScope {repo_id} to {download_dir}..."
+        )
 
     # ModelScope snapshot_download returns the cache path
     # Use cache_dir parameter for better compatibility across versions
@@ -204,7 +213,9 @@ def _ensure_model_downloaded(model_name: str, checkpoint_dir: str) -> str:
         print("[Model Download] User preference: ModelScope")
     else:
         use_huggingface = _can_access_google()
-        print(f"[Model Download] Auto-detected: {'HuggingFace Hub' if use_huggingface else 'ModelScope'}")
+        print(
+            f"[Model Download] Auto-detected: {'HuggingFace Hub' if use_huggingface else 'ModelScope'}"
+        )
 
     if use_huggingface:
         print("[Model Download] Using HuggingFace Hub...")
@@ -237,7 +248,9 @@ RESULT_KEY_PREFIX = "ace_step_v1.5_"
 RESULT_EXPIRE_SECONDS = 7 * 24 * 60 * 60  # 7 days
 TASK_TIMEOUT_SECONDS = 3600  # 1 hour
 JOB_STORE_CLEANUP_INTERVAL = 300  # 5 minutes - interval for cleaning up old jobs
-JOB_STORE_MAX_AGE_SECONDS = 86400  # 24 hours - completed jobs older than this will be cleaned
+JOB_STORE_MAX_AGE_SECONDS = (
+    86400  # 24 hours - completed jobs older than this will be cleaned
+)
 STATUS_MAP = {"queued": 0, "running": 0, "succeeded": 1, "failed": 2}
 
 LM_DEFAULT_TEMPERATURE = 0.85
@@ -245,7 +258,9 @@ LM_DEFAULT_CFG_SCALE = 2.5
 LM_DEFAULT_TOP_P = 0.9
 
 
-def _wrap_response(data: Any, code: int = 200, error: Optional[str] = None) -> Dict[str, Any]:
+def _wrap_response(
+    data: Any, code: int = 200, error: Optional[str] = None
+) -> Dict[str, Any]:
     """Wrap response data in standard format."""
     return {
         "data": data,
@@ -267,12 +282,16 @@ CUSTOM_MODE_EXAMPLES_DIR = os.path.join(_get_project_root(), "examples", "text2m
 def _load_all_examples(sample_mode: str = "simple_mode") -> List[Dict[str, Any]]:
     """Load all example data files from the examples directory."""
     examples = []
-    examples_dir = SIMPLE_MODE_EXAMPLES_DIR if sample_mode == "simple_mode" else CUSTOM_MODE_EXAMPLES_DIR
+    examples_dir = (
+        SIMPLE_MODE_EXAMPLES_DIR
+        if sample_mode == "simple_mode"
+        else CUSTOM_MODE_EXAMPLES_DIR
+    )
     pattern = os.path.join(examples_dir, "example_*.json")
 
     for filepath in glob.glob(pattern):
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 examples.append(data)
         except Exception as e:
@@ -282,8 +301,12 @@ def _load_all_examples(sample_mode: str = "simple_mode") -> List[Dict[str, Any]]
 
 
 # Pre-load example data at module load time
-SIMPLE_EXAMPLE_DATA: List[Dict[str, Any]] = _load_all_examples(sample_mode="simple_mode")
-CUSTOM_EXAMPLE_DATA: List[Dict[str, Any]] = _load_all_examples(sample_mode="custom_mode")
+SIMPLE_EXAMPLE_DATA: List[Dict[str, Any]] = _load_all_examples(
+    sample_mode="simple_mode"
+)
+CUSTOM_EXAMPLE_DATA: List[Dict[str, Any]] = _load_all_examples(
+    sample_mode="custom_mode"
+)
 
 # =============================================================================
 # API Key Authentication
@@ -298,7 +321,9 @@ def set_api_key(key: Optional[str]):
     _api_key = key
 
 
-def verify_token_from_request(body: dict, authorization: Optional[str] = None) -> Optional[str]:
+def verify_token_from_request(
+    body: dict, authorization: Optional[str] = None
+) -> Optional[str]:
     """
     Verify API key from request body (ai_token) or Authorization header.
     Returns the token if valid, None if no auth required.
@@ -324,7 +349,9 @@ def verify_token_from_request(body: dict, authorization: Optional[str] = None) -
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     # No token provided but auth is required
-    raise HTTPException(status_code=401, detail="Missing ai_token or Authorization header")
+    raise HTTPException(
+        status_code=401, detail="Missing ai_token or Authorization header"
+    )
 
 
 async def verify_api_key(authorization: Optional[str] = Header(None)):
@@ -344,6 +371,7 @@ async def verify_api_key(authorization: Optional[str] = Header(None)):
     if token != _api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
+
 # Parameter aliases for request parsing
 PARAM_ALIASES = {
     "prompt": ["prompt", "caption"],
@@ -357,7 +385,13 @@ PARAM_ALIASES = {
     "model": ["model", "model_name", "modelName", "dit_model", "ditModel"],
     "key_scale": ["key_scale", "keyscale", "keyScale", "key"],
     "time_signature": ["time_signature", "timesignature", "timeSignature"],
-    "audio_duration": ["audio_duration", "duration", "audioDuration", "target_duration", "targetDuration"],
+    "audio_duration": [
+        "audio_duration",
+        "duration",
+        "audioDuration",
+        "target_duration",
+        "targetDuration",
+    ],
     "vocal_language": ["vocal_language", "vocalLanguage", "language"],
     "bpm": ["bpm"],
     "inference_steps": ["inference_steps", "inferenceSteps"],
@@ -369,8 +403,15 @@ PARAM_ALIASES = {
     "task_type": ["task_type", "taskType"],
     "infer_method": ["infer_method", "inferMethod"],
     "use_tiled_decode": ["use_tiled_decode", "useTiledDecode"],
-    "constrained_decoding": ["constrained_decoding", "constrainedDecoding", "constrained"],
-    "constrained_decoding_debug": ["constrained_decoding_debug", "constrainedDecodingDebug"],
+    "constrained_decoding": [
+        "constrained_decoding",
+        "constrainedDecoding",
+        "constrained",
+    ],
+    "constrained_decoding_debug": [
+        "constrained_decoding_debug",
+        "constrainedDecodingDebug",
+    ],
     "use_cot_caption": ["use_cot_caption", "cot_caption", "cot-caption"],
     "use_cot_language": ["use_cot_language", "cot_language", "cot-language"],
     "is_format_caption": ["is_format_caption", "isFormatCaption"],
@@ -381,71 +422,100 @@ PARAM_ALIASES = {
 def _parse_description_hints(description: str) -> tuple[Optional[str], bool]:
     """
     Parse a description string to extract language code and instrumental flag.
-    
+
     This function analyzes user descriptions like "Pop rock. English" or "piano solo"
     to detect:
     - Language: Maps language names to ISO codes (e.g., "English" -> "en")
     - Instrumental: Detects patterns indicating instrumental/no-vocal music
-    
+
     Args:
         description: User's natural language music description
-        
+
     Returns:
         (language_code, is_instrumental) tuple:
         - language_code: ISO language code (e.g., "en", "zh") or None if not detected
         - is_instrumental: True if description indicates instrumental music
     """
     import re
-    
+
     if not description:
         return None, False
-    
+
     description_lower = description.lower().strip()
-    
+
     # Language mapping: input patterns -> ISO code
     language_mapping = {
-        'english': 'en', 'en': 'en',
-        'chinese': 'zh', '中文': 'zh', 'zh': 'zh', 'mandarin': 'zh',
-        'japanese': 'ja', '日本語': 'ja', 'ja': 'ja',
-        'korean': 'ko', '한국어': 'ko', 'ko': 'ko',
-        'spanish': 'es', 'español': 'es', 'es': 'es',
-        'french': 'fr', 'français': 'fr', 'fr': 'fr',
-        'german': 'de', 'deutsch': 'de', 'de': 'de',
-        'italian': 'it', 'italiano': 'it', 'it': 'it',
-        'portuguese': 'pt', 'português': 'pt', 'pt': 'pt',
-        'russian': 'ru', 'русский': 'ru', 'ru': 'ru',
-        'bengali': 'bn', 'bn': 'bn',
-        'hindi': 'hi', 'hi': 'hi',
-        'arabic': 'ar', 'ar': 'ar',
-        'thai': 'th', 'th': 'th',
-        'vietnamese': 'vi', 'vi': 'vi',
-        'indonesian': 'id', 'id': 'id',
-        'turkish': 'tr', 'tr': 'tr',
-        'dutch': 'nl', 'nl': 'nl',
-        'polish': 'pl', 'pl': 'pl',
+        "english": "en",
+        "en": "en",
+        "chinese": "zh",
+        "中文": "zh",
+        "zh": "zh",
+        "mandarin": "zh",
+        "japanese": "ja",
+        "日本語": "ja",
+        "ja": "ja",
+        "korean": "ko",
+        "한국어": "ko",
+        "ko": "ko",
+        "spanish": "es",
+        "español": "es",
+        "es": "es",
+        "french": "fr",
+        "français": "fr",
+        "fr": "fr",
+        "german": "de",
+        "deutsch": "de",
+        "de": "de",
+        "italian": "it",
+        "italiano": "it",
+        "it": "it",
+        "portuguese": "pt",
+        "português": "pt",
+        "pt": "pt",
+        "russian": "ru",
+        "русский": "ru",
+        "ru": "ru",
+        "bengali": "bn",
+        "bn": "bn",
+        "hindi": "hi",
+        "hi": "hi",
+        "arabic": "ar",
+        "ar": "ar",
+        "thai": "th",
+        "th": "th",
+        "vietnamese": "vi",
+        "vi": "vi",
+        "indonesian": "id",
+        "id": "id",
+        "turkish": "tr",
+        "tr": "tr",
+        "dutch": "nl",
+        "nl": "nl",
+        "polish": "pl",
+        "pl": "pl",
     }
-    
+
     # Detect language
     detected_language = None
     for lang_name, lang_code in language_mapping.items():
         if len(lang_name) <= 2:
-            pattern = r'(?:^|\s|[.,;:!?])' + re.escape(lang_name) + r'(?:$|\s|[.,;:!?])'
+            pattern = r"(?:^|\s|[.,;:!?])" + re.escape(lang_name) + r"(?:$|\s|[.,;:!?])"
         else:
-            pattern = r'\b' + re.escape(lang_name) + r'\b'
-        
+            pattern = r"\b" + re.escape(lang_name) + r"\b"
+
         if re.search(pattern, description_lower):
             detected_language = lang_code
             break
-    
+
     # Detect instrumental
     is_instrumental = False
-    if 'instrumental' in description_lower:
+    if "instrumental" in description_lower:
         is_instrumental = True
-    elif 'pure music' in description_lower or 'pure instrument' in description_lower:
+    elif "pure music" in description_lower or "pure instrument" in description_lower:
         is_instrumental = True
-    elif description_lower.endswith(' solo') or description_lower == 'solo':
+    elif description_lower.endswith(" solo") or description_lower == "solo":
         is_instrumental = True
-    
+
     return detected_language, is_instrumental
 
 
@@ -464,11 +534,18 @@ class GenerateMusicRequest(BaseModel):
     # Sample-mode requests auto-generate caption/lyrics/metas via LM (no user prompt).
     sample_mode: bool = False
     # Description for sample mode: auto-generate caption/lyrics from description query
-    sample_query: str = Field(default="", description="Query/description for sample mode (use create_sample)")
+    sample_query: str = Field(
+        default="", description="Query/description for sample mode (use create_sample)"
+    )
     # Whether to use format_sample() to enhance input caption/lyrics
-    use_format: bool = Field(default=False, description="Use format_sample() to enhance input (default: False)")
+    use_format: bool = Field(
+        default=False,
+        description="Use format_sample() to enhance input (default: False)",
+    )
     # Model name for multi-model support (select which DiT model to use)
-    model: Optional[str] = Field(default=None, description="Model name to use (e.g., 'acestep-v15-turbo')")
+    model: Optional[str] = Field(
+        default=None, description="Model name to use (e.g., 'acestep-v15-turbo')"
+    )
 
     bpm: Optional[int] = None
     # Accept common client keys via manual parsing (see RequestParser).
@@ -502,11 +579,11 @@ class GenerateMusicRequest(BaseModel):
     infer_method: str = "ode"  # "ode" or "sde" - diffusion inference method
     shift: float = Field(
         default=3.0,
-        description="Timestep shift factor (range 1.0~5.0, default 3.0). Only effective for base models, not turbo models."
+        description="Timestep shift factor (range 1.0~5.0, default 3.0). Only effective for base models, not turbo models.",
     )
     timesteps: Optional[str] = Field(
         default=None,
-        description="Custom timesteps (comma-separated, e.g., '0.97,0.76,0.615,0.5,0.395,0.28,0.18,0.085,0'). Overrides inference_steps and shift."
+        description="Custom timesteps (comma-separated, e.g., '0.97,0.76,0.615,0.5,0.395,0.28,0.18,0.085,0'). Overrides inference_steps and shift.",
     )
 
     audio_format: str = "mp3"
@@ -540,7 +617,7 @@ class CreateJobResponse(BaseModel):
     status: JobStatus
     queue_position: int = 0  # 1-based best-effort position when queued
     progress_text: Optional[str] = ""
-    
+
 
 class JobResult(BaseModel):
     first_audio_path: Optional[str] = None
@@ -557,7 +634,7 @@ class JobResult(BaseModel):
     genres: Optional[str] = None
     keyscale: Optional[str] = None
     timesignature: Optional[str] = None
-    
+
     # Model information
     lm_model: Optional[str] = None
     dit_model: Optional[str] = None
@@ -609,10 +686,7 @@ class _JobStore:
     def create_with_id(self, job_id: str, env: str = "development") -> _JobRecord:
         """Create job record with specified ID"""
         rec = _JobRecord(
-            job_id=job_id,
-            status="queued",
-            created_at=time.time(),
-            env=env
+            job_id=job_id, status="queued", created_at=time.time(), env=env
         )
         with self._lock:
             self._jobs[job_id] = rec
@@ -686,7 +760,7 @@ class _JobStore:
                 if rec.status in stats:
                     stats[rec.status] += 1
             return stats
-    
+
     def update_status_text(self, job_id: str, text: str) -> None:
         with self._lock:
             if job_id in self._jobs:
@@ -696,6 +770,7 @@ class _JobStore:
         with self._lock:
             if job_id in self._jobs:
                 self._jobs[job_id].progress_text = text
+
 
 def _env_bool(name: str, default: bool) -> bool:
     v = os.getenv(name)
@@ -707,10 +782,10 @@ def _env_bool(name: str, default: bool) -> bool:
 def _get_model_name(config_path: str) -> str:
     """
     Extract model name from config_path.
-    
+
     Args:
         config_path: Path like "acestep-v15-turbo" or "/path/to/acestep-v15-turbo"
-        
+
     Returns:
         Model name (last directory name from config_path)
     """
@@ -865,30 +940,100 @@ class RequestParser:
 # Audio file validation
 # ---------------------------------------------------------------------------
 ALLOWED_AUDIO_EXTENSIONS = {
-    ".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".aac", ".wma", ".aiff", ".aif",
+    ".wav",
+    ".mp3",
+    ".flac",
+    ".ogg",
+    ".opus",
+    ".m4a",
+    ".aac",
+    ".wma",
+    ".aiff",
+    ".aif",
 }
 ALLOWED_AUDIO_MIMETYPES = {
-    "audio/wav", "audio/x-wav", "audio/wave",
-    "audio/mpeg", "audio/mp3",
-    "audio/flac", "audio/x-flac",
-    "audio/ogg", "audio/opus",
-    "audio/mp4", "audio/x-m4a", "audio/aac", "audio/x-aac",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/wave",
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/flac",
+    "audio/x-flac",
+    "audio/ogg",
+    "audio/opus",
+    "audio/mp4",
+    "audio/x-m4a",
+    "audio/aac",
+    "audio/x-aac",
     "audio/x-ms-wma",
-    "audio/aiff", "audio/x-aiff",
+    "audio/aiff",
+    "audio/x-aiff",
     # Some clients send generic binary type — we allow it only if the extension is valid
     "application/octet-stream",
 }
 
+# Magic byte signatures for supported audio formats.
+# Each entry maps a byte prefix to a human-readable format name.
+_AUDIO_MAGIC_BYTES: list[tuple[bytes, str]] = [
+    (b"RIFF", "WAV/RIFF"),  # WAV (RIFF container)
+    (b"fLaC", "FLAC"),  # FLAC
+    (b"OggS", "OGG/Opus"),  # OGG / Opus
+    (b"FORM", "AIFF"),  # AIFF
+    (b"ID3", "MP3 (ID3)"),  # MP3 with ID3 tag
+    (b"\xff\xfb", "MP3"),  # MP3 frame sync (MPEG1 Layer3)
+    (b"\xff\xf3", "MP3"),  # MP3 frame sync (MPEG2 Layer3)
+    (b"\xff\xf2", "MP3"),  # MP3 frame sync (MPEG2.5 Layer3)
+    (b"\xff\xfa", "MP3"),  # MP3 frame sync (MPEG1 Layer3, no CRC)
+    (b"\xff\xe3", "MP3"),  # MP3 frame sync (MPEG2 Layer3, no CRC)
+    (b"\xff\xe2", "MP3"),  # MP3 frame sync (MPEG2.5 Layer3, no CRC)
+]
+
+# ftyp-based container formats (MP4/M4A/AAC) need special handling because
+# the 'ftyp' marker starts at byte offset 4 (bytes 0-3 are the box size).
+_FTYP_OFFSET = 4
+_FTYP_MARKER = b"ftyp"
+
+# Maximum file upload size in bytes (500 MB).  Override via ACESTEP_MAX_UPLOAD_BYTES env var.
+MAX_UPLOAD_BYTES: int = int(
+    os.environ.get("ACESTEP_MAX_UPLOAD_BYTES", str(500 * 1024 * 1024))
+)
+
+
+def _has_audio_magic_bytes(header: bytes) -> bool:
+    """Return True if *header* (>= 12 bytes) starts with a known audio signature."""
+    for magic, _name in _AUDIO_MAGIC_BYTES:
+        if header[: len(magic)] == magic:
+            return True
+    # MP4/M4A/AAC: 'ftyp' at offset 4
+    if len(header) > _FTYP_OFFSET + len(_FTYP_MARKER):
+        if header[_FTYP_OFFSET : _FTYP_OFFSET + len(_FTYP_MARKER)] == _FTYP_MARKER:
+            return True
+    return False
+
 
 def _validate_audio_upload(upload: StarletteUploadFile) -> None:
     """Validate that an uploaded file looks like a supported audio file.
+
+    Checks filename extension, MIME type, and — where possible — that the
+    file header starts with a recognised audio magic-byte sequence.
 
     Raises ``HTTPException(400)`` when the file fails validation.
     """
     filename = upload.filename or ""
     ext = Path(filename).suffix.lower()
 
-    if ext and ext not in ALLOWED_AUDIO_EXTENSIONS:
+    # Reject files with no extension (cannot determine type)
+    if not ext:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Cannot determine file type: filename has no extension. "
+                f"Please provide a file with one of these extensions: "
+                f"{', '.join(sorted(ALLOWED_AUDIO_EXTENSIONS))}"
+            ),
+        )
+
+    if ext not in ALLOWED_AUDIO_EXTENSIONS:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -908,7 +1053,10 @@ def _validate_audio_upload(upload: StarletteUploadFile) -> None:
         )
 
     # If the MIME type is the generic octet-stream, require a valid extension
-    if content_type == "application/octet-stream" and ext not in ALLOWED_AUDIO_EXTENSIONS:
+    if (
+        content_type == "application/octet-stream"
+        and ext not in ALLOWED_AUDIO_EXTENSIONS
+    ):
         raise HTTPException(
             status_code=400,
             detail=(
@@ -919,19 +1067,105 @@ def _validate_audio_upload(upload: StarletteUploadFile) -> None:
         )
 
 
+def _validate_audio_file_path(file_path: str) -> None:
+    """Validate a server-side audio file path.
+
+    Checks that the file exists, has a valid audio extension, and its header
+    contains recognised audio magic bytes.
+
+    Raises ``HTTPException(400)`` on failure.
+    """
+    if not file_path:
+        return
+
+    resolved = os.path.realpath(file_path)
+    if not os.path.isfile(resolved):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Audio file not found: '{file_path}'",
+        )
+
+    ext = Path(resolved).suffix.lower()
+    if not ext or ext not in ALLOWED_AUDIO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported audio file extension '{ext}' for path '{file_path}'. "
+                f"Allowed extensions: {', '.join(sorted(ALLOWED_AUDIO_EXTENSIONS))}"
+            ),
+        )
+
+    # Magic-byte check
+    try:
+        with open(resolved, "rb") as f:
+            header = f.read(12)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot read audio file '{file_path}': {exc}",
+        )
+
+    if len(header) < 4:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File '{file_path}' is too small to be a valid audio file.",
+        )
+
+    if not _has_audio_magic_bytes(header):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"File '{file_path}' does not appear to be a valid audio file "
+                f"(unrecognised file header). Supported formats: WAV, MP3, FLAC, "
+                f"OGG, Opus, M4A, AAC, WMA, AIFF."
+            ),
+        )
+
+
 async def _save_upload_to_temp(upload: StarletteUploadFile, *, prefix: str) -> str:
+    """Save an uploaded audio file to a temp path after validating it.
+
+    Enforces a maximum file size (``MAX_UPLOAD_BYTES``) and verifies the
+    first bytes of the file contain a recognised audio header.
+
+    Raises ``HTTPException(400)`` if validation fails, ``HTTPException(413)``
+    if the file exceeds the size limit.
+    """
     _validate_audio_upload(upload)
 
     suffix = Path(upload.filename or "").suffix
     fd, path = tempfile.mkstemp(prefix=f"{prefix}_", suffix=suffix)
     os.close(fd)
     try:
+        total_bytes = 0
         with open(path, "wb") as f:
             while True:
                 chunk = await upload.read(1024 * 1024)
                 if not chunk:
                     break
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UPLOAD_BYTES:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            f"Upload too large: exceeds {MAX_UPLOAD_BYTES / (1024 * 1024):.0f} MB limit. "
+                            f"Set ACESTEP_MAX_UPLOAD_BYTES to increase."
+                        ),
+                    )
                 f.write(chunk)
+
+        # Verify the saved file actually looks like audio (magic byte check)
+        with open(path, "rb") as f:
+            header = f.read(12)
+        if len(header) >= 4 and not _has_audio_magic_bytes(header):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Uploaded file does not appear to be a valid audio file "
+                    "(unrecognised file header). Supported formats: WAV, MP3, FLAC, "
+                    "OGG, Opus, M4A, AAC, WMA, AIFF."
+                ),
+            )
     except Exception:
         try:
             os.remove(path)
@@ -945,6 +1179,7 @@ async def _save_upload_to_temp(upload: StarletteUploadFile, *, prefix: str) -> s
             pass
     return path
 
+
 class LogBuffer:
     def __init__(self):
         self.last_message = "Waiting"
@@ -957,8 +1192,12 @@ class LogBuffer:
     def flush(self):
         pass
 
+
 log_buffer = LogBuffer()
-logger.add(lambda msg: log_buffer.write(msg), format="{time:HH:mm:ss} | {level} | {message}")
+logger.add(
+    lambda msg: log_buffer.write(msg), format="{time:HH:mm:ss} | {level} | {message}"
+)
+
 
 class StderrLogger:
     def __init__(self, original_stderr, buffer):
@@ -966,11 +1205,12 @@ class StderrLogger:
         self.buffer = buffer
 
     def write(self, message):
-        self.original_stderr.write(message) # Print to terminal
-        self.buffer.write(message)          # Send to API buffer
+        self.original_stderr.write(message)  # Print to terminal
+        self.buffer.write(message)  # Send to API buffer
 
     def flush(self):
         self.original_stderr.flush()
+
 
 sys.stderr = StderrLogger(sys.stderr, log_buffer)
 
@@ -983,7 +1223,9 @@ def create_app() -> FastAPI:
     set_api_key(api_key)
 
     QUEUE_MAXSIZE = int(os.getenv("ACESTEP_QUEUE_MAXSIZE", "200"))
-    WORKER_COUNT = int(os.getenv("ACESTEP_QUEUE_WORKERS", "1"))  # Single GPU recommended
+    WORKER_COUNT = int(
+        os.getenv("ACESTEP_QUEUE_WORKERS", "1")
+    )  # Single GPU recommended
 
     INITIAL_AVG_JOB_SECONDS = float(os.getenv("ACESTEP_AVG_JOB_SECONDS", "5.0"))
     AVG_WINDOW = int(os.getenv("ACESTEP_AVG_WINDOW", "50"))
@@ -1000,16 +1242,29 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         # Clear proxy env that may affect downstream libs
-        for proxy_var in ["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"]:
+        for proxy_var in [
+            "http_proxy",
+            "https_proxy",
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
+        ]:
             os.environ.pop(proxy_var, None)
 
         # Ensure compilation/temp caches do not fill up small default /tmp.
         # Triton/Inductor (and the system compiler) can create large temporary files.
         project_root = _get_project_root()
         cache_root = os.path.join(project_root, ".cache", "acestep")
-        tmp_root = (os.getenv("ACESTEP_TMPDIR") or os.path.join(cache_root, "tmp")).strip()
-        triton_cache_root = (os.getenv("TRITON_CACHE_DIR") or os.path.join(cache_root, "triton")).strip()
-        inductor_cache_root = (os.getenv("TORCHINDUCTOR_CACHE_DIR") or os.path.join(cache_root, "torchinductor")).strip()
+        tmp_root = (
+            os.getenv("ACESTEP_TMPDIR") or os.path.join(cache_root, "tmp")
+        ).strip()
+        triton_cache_root = (
+            os.getenv("TRITON_CACHE_DIR") or os.path.join(cache_root, "triton")
+        ).strip()
+        inductor_cache_root = (
+            os.getenv("TORCHINDUCTOR_CACHE_DIR")
+            or os.path.join(cache_root, "torchinductor")
+        ).strip()
 
         for p in [cache_root, tmp_root, triton_cache_root, inductor_cache_root]:
             try:
@@ -1042,19 +1297,21 @@ def create_app() -> FastAPI:
         app.state._llm_initialized = False
         app.state._llm_init_error = None
         app.state._llm_init_lock = Lock()
-        app.state._llm_lazy_load_disabled = False  # Will be set to True if LLM skipped due to GPU config
+        app.state._llm_lazy_load_disabled = (
+            False  # Will be set to True if LLM skipped due to GPU config
+        )
 
         # Multi-model support: secondary DiT handlers
         handler2 = None
         handler3 = None
         config_path2 = os.getenv("ACESTEP_CONFIG_PATH2", "").strip()
         config_path3 = os.getenv("ACESTEP_CONFIG_PATH3", "").strip()
-        
+
         if config_path2:
             handler2 = AceStepHandler()
         if config_path3:
             handler3 = AceStepHandler()
-        
+
         app.state.handler2 = handler2
         app.state.handler3 = handler3
         app.state._initialized2 = False
@@ -1084,7 +1341,7 @@ def create_app() -> FastAPI:
         app.state.executor = executor
         app.state.job_store = store
         app.state._python_executable = sys.executable
-        
+
         # Temporary directory for saving generated audio files
         app.state.temp_audio_dir = os.path.join(tmp_root, "api_audio")
         os.makedirs(app.state.temp_audio_dir, exist_ok=True)
@@ -1092,6 +1349,7 @@ def create_app() -> FastAPI:
         # Initialize local cache
         try:
             from acestep.local_cache import get_local_cache
+
             local_cache_dir = os.path.join(cache_root, "local_redis")
             app.state.local_cache = get_local_cache(local_cache_dir)
         except ImportError:
@@ -1113,14 +1371,16 @@ def create_app() -> FastAPI:
                 except Exception:
                     pass
 
-        def _update_local_cache(job_id: str, result: Optional[Dict], status: str) -> None:
+        def _update_local_cache(
+            job_id: str, result: Optional[Dict], status: str
+        ) -> None:
             """Update local cache with job result"""
-            local_cache = getattr(app.state, 'local_cache', None)
+            local_cache = getattr(app.state, "local_cache", None)
             if not local_cache:
                 return
 
             rec = store.get(job_id)
-            env = getattr(rec, 'env', 'development') if rec else 'development'
+            env = getattr(rec, "env", "development") if rec else "development"
             create_time = rec.created_at if rec else time.time()
 
             status_int = _map_status(status)
@@ -1173,24 +1433,35 @@ def create_app() -> FastAPI:
                             for p in audio_paths
                         ]
                     else:
-                        result_data = [{
-                            "file": "",
-                            "wave": "",
-                            "status": status_int,
-                            "create_time": int(create_time),
-                            "env": env,
-                            "prompt": final_prompt,
-                            "lyrics": final_lyrics,
-                            "metas": metas,
-                            "generation_info": generation_info,
-                            "seed_value": seed_value,
-                            "lm_model": lm_model,
-                            "dit_model": dit_model,
-                        }]
+                        result_data = [
+                            {
+                                "file": "",
+                                "wave": "",
+                                "status": status_int,
+                                "create_time": int(create_time),
+                                "env": env,
+                                "prompt": final_prompt,
+                                "lyrics": final_lyrics,
+                                "metas": metas,
+                                "generation_info": generation_info,
+                                "seed_value": seed_value,
+                                "lm_model": lm_model,
+                                "dit_model": dit_model,
+                            }
+                        ]
             else:
                 # Failed or other status - include error from job store
                 error_msg = rec.error if rec and rec.error else None
-                result_data = [{"file": "", "wave": "", "status": status_int, "create_time": int(create_time), "env": env, "error": error_msg}]
+                result_data = [
+                    {
+                        "file": "",
+                        "wave": "",
+                        "status": status_int,
+                        "create_time": int(create_time),
+                        "env": env,
+                        "error": error_msg,
+                    }
+                ]
 
             result_key = f"{RESULT_KEY_PREFIX}{job_id}"
             local_cache.set(result_key, result_data, ex=RESULT_EXPIRE_SECONDS)
@@ -1202,15 +1473,15 @@ def create_app() -> FastAPI:
 
             await _ensure_initialized()
             job_store.mark_running(job_id)
-            
+
             # Select DiT handler based on user's model choice
             # Default: use primary handler
             selected_handler: AceStepHandler = app.state.handler
             selected_model_name = _get_model_name(app.state._config_path)
-            
+
             if req.model:
                 model_matched = False
-                
+
                 # Check if it matches the second model
                 if app.state.handler2 and getattr(app.state, "_initialized2", False):
                     model2_name = _get_model_name(app.state._config_path2)
@@ -1218,25 +1489,43 @@ def create_app() -> FastAPI:
                         selected_handler = app.state.handler2
                         selected_model_name = model2_name
                         model_matched = True
-                        print(f"[API Server] Job {job_id}: Using second model: {model2_name}")
-                
+                        print(
+                            f"[API Server] Job {job_id}: Using second model: {model2_name}"
+                        )
+
                 # Check if it matches the third model
-                if not model_matched and app.state.handler3 and getattr(app.state, "_initialized3", False):
+                if (
+                    not model_matched
+                    and app.state.handler3
+                    and getattr(app.state, "_initialized3", False)
+                ):
                     model3_name = _get_model_name(app.state._config_path3)
                     if req.model == model3_name:
                         selected_handler = app.state.handler3
                         selected_model_name = model3_name
                         model_matched = True
-                        print(f"[API Server] Job {job_id}: Using third model: {model3_name}")
-                
+                        print(
+                            f"[API Server] Job {job_id}: Using third model: {model3_name}"
+                        )
+
                 if not model_matched:
                     available_models = [_get_model_name(app.state._config_path)]
-                    if app.state.handler2 and getattr(app.state, "_initialized2", False):
-                        available_models.append(_get_model_name(app.state._config_path2))
-                    if app.state.handler3 and getattr(app.state, "_initialized3", False):
-                        available_models.append(_get_model_name(app.state._config_path3))
-                    print(f"[API Server] Job {job_id}: Model '{req.model}' not found in {available_models}, using primary: {selected_model_name}")
-            
+                    if app.state.handler2 and getattr(
+                        app.state, "_initialized2", False
+                    ):
+                        available_models.append(
+                            _get_model_name(app.state._config_path2)
+                        )
+                    if app.state.handler3 and getattr(
+                        app.state, "_initialized3", False
+                    ):
+                        available_models.append(
+                            _get_model_name(app.state._config_path3)
+                        )
+                    print(
+                        f"[API Server] Job {job_id}: Model '{req.model}' not found in {available_models}, using primary: {selected_model_name}"
+                    )
+
             # Use selected handler for generation
             h: AceStepHandler = selected_handler
 
@@ -1258,13 +1547,27 @@ def create_app() -> FastAPI:
                                 "in .env or environment variables. For this request, optional LLM features "
                                 "(use_cot_caption, use_cot_language) will be auto-disabled."
                             )
-                            print(f"[API Server] LLM lazy load blocked: LLM was not initialized at startup")
+                            print(
+                                f"[API Server] LLM lazy load blocked: LLM was not initialized at startup"
+                            )
                             return
 
                         project_root = _get_project_root()
                         checkpoint_dir = os.path.join(project_root, "checkpoints")
-                        lm_model_path = (req.lm_model_path or os.getenv("ACESTEP_LM_MODEL_PATH") or "acestep-5Hz-lm-0.6B").strip()
-                        backend = (req.lm_backend or os.getenv("ACESTEP_LM_BACKEND") or "vllm").strip().lower()
+                        lm_model_path = (
+                            req.lm_model_path
+                            or os.getenv("ACESTEP_LM_MODEL_PATH")
+                            or "acestep-5Hz-lm-0.6B"
+                        ).strip()
+                        backend = (
+                            (
+                                req.lm_backend
+                                or os.getenv("ACESTEP_LM_BACKEND")
+                                or "vllm"
+                            )
+                            .strip()
+                            .lower()
+                        )
                         if backend not in {"vllm", "pt"}:
                             backend = "vllm"
 
@@ -1274,9 +1577,13 @@ def create_app() -> FastAPI:
                             try:
                                 _ensure_model_downloaded(lm_model_name, checkpoint_dir)
                             except Exception as e:
-                                print(f"[API Server] Warning: Failed to download LM model {lm_model_name}: {e}")
+                                print(
+                                    f"[API Server] Warning: Failed to download LM model {lm_model_name}: {e}"
+                                )
 
-                        lm_device = os.getenv("ACESTEP_LM_DEVICE", os.getenv("ACESTEP_DEVICE", "auto"))
+                        lm_device = os.getenv(
+                            "ACESTEP_LM_DEVICE", os.getenv("ACESTEP_DEVICE", "auto")
+                        )
                         lm_offload = _env_bool("ACESTEP_LM_OFFLOAD_TO_CPU", False)
 
                         status, ok = llm.initialize(
@@ -1328,7 +1635,13 @@ def create_app() -> FastAPI:
                 # - sample_query/description (LM generates from description)
                 # - use_format (LM enhances caption/lyrics)
                 # - full_analysis_only (LM understands audio codes)
-                require_llm = thinking or sample_mode or has_sample_query or use_format or full_analysis_only
+                require_llm = (
+                    thinking
+                    or sample_mode
+                    or has_sample_query
+                    or use_format
+                    or full_analysis_only
+                )
 
                 # LLM is OPTIONAL for these features (auto-disable if unavailable):
                 # - use_cot_caption or use_cot_language (LM enhances metadata)
@@ -1343,12 +1656,16 @@ def create_app() -> FastAPI:
 
                 # Fail if LLM is required but unavailable
                 if require_llm and not llm_available:
-                    raise RuntimeError(f"5Hz LM init failed: {app.state._llm_init_error}")
+                    raise RuntimeError(
+                        f"5Hz LM init failed: {app.state._llm_init_error}"
+                    )
 
                 # Auto-disable optional LLM features if unavailable
                 if want_llm and not llm_available:
                     if use_cot_caption or use_cot_language:
-                        print(f"[API Server] LLM unavailable, auto-disabling: use_cot_caption={use_cot_caption}->False, use_cot_language={use_cot_language}->False")
+                        print(
+                            f"[API Server] LLM unavailable, auto-disabling: use_cot_caption={use_cot_caption}->False, use_cot_language={use_cot_language}->False"
+                        )
                     use_cot_caption = False
                     use_cot_language = False
 
@@ -1363,17 +1680,25 @@ def create_app() -> FastAPI:
                 # Save original user input for metas
                 original_prompt = req.prompt or ""
                 original_lyrics = req.lyrics or ""
-                
+
                 if sample_mode or has_sample_query:
                     # Parse description hints from sample_query (if provided)
-                    sample_query = req.sample_query if has_sample_query else "NO USER INPUT"
-                    parsed_language, parsed_instrumental = _parse_description_hints(sample_query)
+                    sample_query = (
+                        req.sample_query if has_sample_query else "NO USER INPUT"
+                    )
+                    parsed_language, parsed_instrumental = _parse_description_hints(
+                        sample_query
+                    )
 
                     # Determine vocal_language with priority:
                     # 1. User-specified vocal_language (if not default "en")
                     # 2. Language parsed from description
                     # 3. None (no constraint)
-                    if req.vocal_language and req.vocal_language not in ("en", "unknown", ""):
+                    if req.vocal_language and req.vocal_language not in (
+                        "en",
+                        "unknown",
+                        "",
+                    ):
                         sample_language = req.vocal_language
                     else:
                         sample_language = parsed_language
@@ -1390,7 +1715,9 @@ def create_app() -> FastAPI:
                     )
 
                     if not sample_result.success:
-                        raise RuntimeError(f"create_sample failed: {sample_result.error or sample_result.status_message}")
+                        raise RuntimeError(
+                            f"create_sample failed: {sample_result.error or sample_result.status_message}"
+                        )
 
                     # Use generated sample data
                     caption = sample_result.caption
@@ -1406,32 +1733,36 @@ def create_app() -> FastAPI:
                 if req.use_format and (caption or lyrics):
                     _ensure_llm_ready()
                     if getattr(app.state, "_llm_init_error", None):
-                        raise RuntimeError(f"5Hz LM init failed (needed for format): {app.state._llm_init_error}")
-                    
+                        raise RuntimeError(
+                            f"5Hz LM init failed (needed for format): {app.state._llm_init_error}"
+                        )
+
                     # Build user_metadata from request params (matching bot.py behavior)
                     user_metadata_for_format = {}
                     if bpm is not None:
-                        user_metadata_for_format['bpm'] = bpm
+                        user_metadata_for_format["bpm"] = bpm
                     if audio_duration is not None and float(audio_duration) > 0:
-                        user_metadata_for_format['duration'] = float(audio_duration)
+                        user_metadata_for_format["duration"] = float(audio_duration)
                     if key_scale:
-                        user_metadata_for_format['keyscale'] = key_scale
+                        user_metadata_for_format["keyscale"] = key_scale
                     if time_signature:
-                        user_metadata_for_format['timesignature'] = time_signature
+                        user_metadata_for_format["timesignature"] = time_signature
                     if req.vocal_language and req.vocal_language != "unknown":
-                        user_metadata_for_format['language'] = req.vocal_language
-                    
+                        user_metadata_for_format["language"] = req.vocal_language
+
                     format_result = format_sample(
                         llm_handler=llm,
                         caption=caption,
                         lyrics=lyrics,
-                        user_metadata=user_metadata_for_format if user_metadata_for_format else None,
+                        user_metadata=user_metadata_for_format
+                        if user_metadata_for_format
+                        else None,
                         temperature=req.lm_temperature,
                         top_k=lm_top_k if lm_top_k > 0 else None,
                         top_p=lm_top_p if lm_top_p < 1.0 else None,
                         use_constrained_decoding=True,
                     )
-                    
+
                     if format_result.success:
                         # Extract all formatted data (matching bot.py behavior)
                         caption = format_result.caption or caption
@@ -1450,12 +1781,17 @@ def create_app() -> FastAPI:
                 parsed_timesteps = _parse_timesteps(req.timesteps)
 
                 # Determine actual inference steps (timesteps override inference_steps)
-                actual_inference_steps = len(parsed_timesteps) if parsed_timesteps else req.inference_steps
+                actual_inference_steps = (
+                    len(parsed_timesteps) if parsed_timesteps else req.inference_steps
+                )
 
                 # Auto-select instruction based on task_type if user didn't provide custom instruction
                 # This matches gradio behavior which uses TASK_INSTRUCTIONS for each task type
                 instruction_to_use = req.instruction
-                if instruction_to_use == DEFAULT_DIT_INSTRUCTION and req.task_type in TASK_INSTRUCTIONS:
+                if (
+                    instruction_to_use == DEFAULT_DIT_INSTRUCTION
+                    and req.task_type in TASK_INSTRUCTIONS
+                ):
                     instruction_to_use = TASK_INSTRUCTIONS[req.task_type]
 
                 # Build GenerationParams using unified interface
@@ -1524,19 +1860,21 @@ def create_app() -> FastAPI:
                     # Step A: Convert source audio to semantic codes
                     # We use params.src_audio which is the server-side path
                     audio_codes = h.convert_src_audio_to_codes(params.src_audio)
-                    
+
                     if not audio_codes or audio_codes.startswith("❌"):
                         raise RuntimeError(f"Audio encoding failed: {audio_codes}")
 
                     # Step B: LLM Understanding of those specific codes
                     # This yields the deep metadata and lyrics transcription
-                    metadata_dict, status_string = llm_to_pass.understand_audio_from_codes(
-                        audio_codes=audio_codes,
-                        temperature=0.3,
-                        use_constrained_decoding=True,
-                        constrained_decoding_debug=config.constrained_decoding_debug
+                    metadata_dict, status_string = (
+                        llm_to_pass.understand_audio_from_codes(
+                            audio_codes=audio_codes,
+                            temperature=0.3,
+                            use_constrained_decoding=True,
+                            constrained_decoding_debug=config.constrained_decoding_debug,
+                        )
                     )
-                    
+
                     if not metadata_dict:
                         raise RuntimeError(f"LLM Understanding failed: {status_string}")
 
@@ -1546,12 +1884,13 @@ def create_app() -> FastAPI:
                         "keyscale": metadata_dict.get("keyscale"),
                         "timesignature": metadata_dict.get("timesignature"),
                         "duration": metadata_dict.get("duration"),
-                        "genre": metadata_dict.get("genres") or metadata_dict.get("genre"),
+                        "genre": metadata_dict.get("genres")
+                        or metadata_dict.get("genre"),
                         "prompt": metadata_dict.get("caption", ""),
                         "lyrics": metadata_dict.get("lyrics", ""),
                         "language": metadata_dict.get("language", "unknown"),
                         "metas": metadata_dict,
-                        "audio_paths": []
+                        "audio_paths": [],
                     }
 
                 if req.analysis_only:
@@ -1564,7 +1903,7 @@ def create_app() -> FastAPI:
                         use_cot_metas=True,
                         use_cot_caption=req.use_cot_caption,
                         use_cot_language=req.use_cot_language,
-                        use_constrained_decoding=True
+                        use_constrained_decoding=True,
                     )
 
                     if not lm_res.get("success"):
@@ -1583,7 +1922,7 @@ def create_app() -> FastAPI:
                         "prompt": metas_found.get("caption", params.caption),
                         "lyrics": params.lyrics,
                         "lm_model": os.getenv("ACESTEP_LM_MODEL_PATH", ""),
-                        "dit_model": "None (Analysis Only)"
+                        "dit_model": "None (Analysis Only)",
                     }
 
                 # Generate music using unified interface
@@ -1597,33 +1936,37 @@ def create_app() -> FastAPI:
                 )
 
                 if not result.success:
-                    raise RuntimeError(f"Music generation failed: {result.error or result.status_message}")
+                    raise RuntimeError(
+                        f"Music generation failed: {result.error or result.status_message}"
+                    )
 
                 # Extract results
-                audio_paths = [audio["path"] for audio in result.audios if audio.get("path")]
+                audio_paths = [
+                    audio["path"] for audio in result.audios if audio.get("path")
+                ]
                 first_audio = audio_paths[0] if len(audio_paths) > 0 else None
                 second_audio = audio_paths[1] if len(audio_paths) > 1 else None
 
                 # Get metadata from LM or CoT results
                 lm_metadata = result.extra_outputs.get("lm_metadata", {})
                 metas_out = _normalize_metas(lm_metadata)
-                
+
                 # Update metas with actual values used
                 if params.cot_bpm:
                     metas_out["bpm"] = params.cot_bpm
                 elif bpm:
                     metas_out["bpm"] = bpm
-                    
+
                 if params.cot_duration:
                     metas_out["duration"] = params.cot_duration
                 elif audio_duration:
                     metas_out["duration"] = audio_duration
-                    
+
                 if params.cot_keyscale:
                     metas_out["keyscale"] = params.cot_keyscale
                 elif key_scale:
                     metas_out["keyscale"] = key_scale
-                    
+
                 if params.cot_timesignature:
                     metas_out["timesignature"] = params.cot_timesignature
                 elif time_signature:
@@ -1661,13 +2004,19 @@ def create_app() -> FastAPI:
                     return s
 
                 # Get model information
-                lm_model_name = os.getenv("ACESTEP_LM_MODEL_PATH", "acestep-5Hz-lm-0.6B")
+                lm_model_name = os.getenv(
+                    "ACESTEP_LM_MODEL_PATH", "acestep-5Hz-lm-0.6B"
+                )
                 # Use selected_model_name (set at the beginning of _run_one_job)
                 dit_model_name = selected_model_name
-                
+
                 return {
-                    "first_audio_path": _path_to_audio_url(first_audio) if first_audio else None,
-                    "second_audio_path": _path_to_audio_url(second_audio) if second_audio else None,
+                    "first_audio_path": _path_to_audio_url(first_audio)
+                    if first_audio
+                    else None,
+                    "second_audio_path": _path_to_audio_url(second_audio)
+                    if second_audio
+                    else None,
                     "audio_paths": [_path_to_audio_url(p) for p in audio_paths],
                     "generation_info": generation_info,
                     "status_message": result.status_message,
@@ -1677,8 +2026,12 @@ def create_app() -> FastAPI:
                     "lyrics": lyrics or "",
                     # metas contains original user input + other metadata
                     "metas": metas_out,
-                    "bpm": metas_out.get("bpm") if isinstance(metas_out.get("bpm"), int) else None,
-                    "duration": metas_out.get("duration") if isinstance(metas_out.get("duration"), (int, float)) else None,
+                    "bpm": metas_out.get("bpm")
+                    if isinstance(metas_out.get("bpm"), int)
+                    else None,
+                    "duration": metas_out.get("duration")
+                    if isinstance(metas_out.get("duration"), (int, float))
+                    else None,
                     "genres": _none_if_na_str(metas_out.get("genres")),
                     "keyscale": _none_if_na_str(metas_out.get("keyscale")),
                     "timesignature": _none_if_na_str(metas_out.get("timesignature")),
@@ -1707,7 +2060,9 @@ def create_app() -> FastAPI:
                 async with app.state.stats_lock:
                     app.state.recent_durations.append(dt)
                     if app.state.recent_durations:
-                        app.state.avg_job_seconds = sum(app.state.recent_durations) / len(app.state.recent_durations)
+                        app.state.avg_job_seconds = sum(
+                            app.state.recent_durations
+                        ) / len(app.state.recent_durations)
 
         async def _queue_worker(worker_idx: int) -> None:
             while True:
@@ -1732,7 +2087,9 @@ def create_app() -> FastAPI:
                     removed = store.cleanup_old_jobs()
                     if removed > 0:
                         stats = store.get_stats()
-                        print(f"[API Server] Cleaned up {removed} old jobs. Current stats: {stats}")
+                        print(
+                            f"[API Server] Cleaned up {removed} old jobs. Current stats: {stats}"
+                        )
                 except asyncio.CancelledError:
                     break
                 except Exception as e:
@@ -1758,9 +2115,9 @@ def create_app() -> FastAPI:
         auto_offload = gpu_memory_gb > 0 and gpu_memory_gb < VRAM_16GB_MIN_GB
 
         # Print GPU configuration info
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("[API Server] GPU Configuration Detected:")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"  GPU Memory: {gpu_memory_gb:.2f} GB")
         print(f"  Configuration Tier: {gpu_config.tier}")
         print(f"  Max Duration (with LM): {gpu_config.max_duration_with_lm}s")
@@ -1769,7 +2126,7 @@ def create_app() -> FastAPI:
         print(f"  Max Batch Size (without LM): {gpu_config.max_batch_size_without_lm}")
         print(f"  Default LM Init: {gpu_config.init_lm_default}")
         print(f"  Available LM Models: {gpu_config.available_lm_models or 'None'}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         if auto_offload:
             print(f"[API Server] Auto-enabling CPU offload (GPU < 16GB)")
@@ -1790,7 +2147,9 @@ def create_app() -> FastAPI:
         else:
             offload_to_cpu = auto_offload
             if auto_offload:
-                print(f"[API Server] Auto-setting offload_to_cpu=True based on GPU memory")
+                print(
+                    f"[API Server] Auto-setting offload_to_cpu=True based on GPU memory"
+                )
 
         offload_dit_to_cpu = _env_bool("ACESTEP_OFFLOAD_DIT_TO_CPU", False)
 
@@ -1836,7 +2195,9 @@ def create_app() -> FastAPI:
                 try:
                     _ensure_model_downloaded(model2_name, checkpoint_dir)
                 except Exception as e:
-                    print(f"[API Server] Warning: Failed to download secondary model: {e}")
+                    print(
+                        f"[API Server] Warning: Failed to download secondary model: {e}"
+                    )
 
             print(f"[API Server] Loading secondary DiT model: {config_path2}")
             try:
@@ -1853,9 +2214,13 @@ def create_app() -> FastAPI:
                 if ok2:
                     print(f"[API Server] Secondary model loaded: {model2_name}")
                 else:
-                    print(f"[API Server] Warning: Secondary model failed: {status_msg2}")
+                    print(
+                        f"[API Server] Warning: Secondary model failed: {status_msg2}"
+                    )
             except Exception as e:
-                print(f"[API Server] Warning: Failed to initialize secondary model: {e}")
+                print(
+                    f"[API Server] Warning: Failed to initialize secondary model: {e}"
+                )
                 app.state._initialized2 = False
 
         # Initialize third model if configured
@@ -1899,23 +2264,35 @@ def create_app() -> FastAPI:
 
         # Step 1: Start with GPU auto-detection result
         init_llm = gpu_config.init_lm_default
-        print(f"[API Server] GPU auto-detection: init_llm={init_llm} (VRAM: {gpu_config.gpu_memory_gb:.1f}GB, tier: {gpu_config.tier})")
+        print(
+            f"[API Server] GPU auto-detection: init_llm={init_llm} (VRAM: {gpu_config.gpu_memory_gb:.1f}GB, tier: {gpu_config.tier})"
+        )
 
         # Step 2: Apply user override if set
         if not init_llm_env or init_llm_env == "auto":
-            print(f"[API Server] ACESTEP_INIT_LLM=auto, using GPU auto-detection result")
+            print(
+                f"[API Server] ACESTEP_INIT_LLM=auto, using GPU auto-detection result"
+            )
         elif init_llm_env in {"1", "true", "yes", "y", "on"}:
             if init_llm:
-                print(f"[API Server] ACESTEP_INIT_LLM=true (GPU already supports LLM, no override needed)")
+                print(
+                    f"[API Server] ACESTEP_INIT_LLM=true (GPU already supports LLM, no override needed)"
+                )
             else:
                 init_llm = True
-                print(f"[API Server] ACESTEP_INIT_LLM=true, overriding GPU auto-detection (force enable)")
+                print(
+                    f"[API Server] ACESTEP_INIT_LLM=true, overriding GPU auto-detection (force enable)"
+                )
         else:
             if not init_llm:
-                print(f"[API Server] ACESTEP_INIT_LLM=false (GPU already disabled LLM, no override needed)")
+                print(
+                    f"[API Server] ACESTEP_INIT_LLM=false (GPU already disabled LLM, no override needed)"
+                )
             else:
                 init_llm = False
-                print(f"[API Server] ACESTEP_INIT_LLM=false, overriding GPU auto-detection (force disable)")
+                print(
+                    f"[API Server] ACESTEP_INIT_LLM=false, overriding GPU auto-detection (force disable)"
+                )
 
         if init_llm:
             print("[API Server] Loading LLM model...")
@@ -1930,11 +2307,15 @@ def create_app() -> FastAPI:
                 recommended_lm = get_recommended_lm_model(gpu_config)
                 if recommended_lm:
                     lm_model_path = recommended_lm
-                    print(f"[API Server] Auto-selected LM model: {lm_model_path} based on GPU tier")
+                    print(
+                        f"[API Server] Auto-selected LM model: {lm_model_path} based on GPU tier"
+                    )
                 else:
                     # No recommended model (GPU tier too low), default to smallest
                     lm_model_path = "acestep-5Hz-lm-0.6B"
-                    print(f"[API Server] No recommended model for this GPU tier, using smallest: {lm_model_path}")
+                    print(
+                        f"[API Server] No recommended model for this GPU tier, using smallest: {lm_model_path}"
+                    )
 
             # Validate LM model support (warning only, does not block)
             is_supported, warning_msg = is_lm_model_supported(lm_model_path, gpu_config)
@@ -1944,10 +2325,14 @@ def create_app() -> FastAPI:
                 recommended_lm = get_recommended_lm_model(gpu_config)
                 if recommended_lm:
                     lm_model_path = recommended_lm
-                    print(f"[API Server] Falling back to supported LM model: {lm_model_path}")
+                    print(
+                        f"[API Server] Falling back to supported LM model: {lm_model_path}"
+                    )
                 else:
                     # No supported model, but user may have forced init
-                    print(f"[API Server] No GPU-validated LM model available, attempting {lm_model_path} anyway (may cause OOM)")
+                    print(
+                        f"[API Server] No GPU-validated LM model available, attempting {lm_model_path} anyway (may cause OOM)"
+                    )
 
         if init_llm:
             lm_backend = os.getenv("ACESTEP_LM_BACKEND", "vllm").strip().lower()
@@ -1982,7 +2367,9 @@ def create_app() -> FastAPI:
                 app.state._llm_init_error = llm_status
                 print(f"[API Server] Warning: LLM model failed to load: {llm_status}")
         else:
-            print("[API Server] Skipping LLM initialization (disabled or not supported for this GPU)")
+            print(
+                "[API Server] Skipping LLM initialization (disabled or not supported for this GPU)"
+            )
             app.state._llm_initialized = False
             # Disable lazy loading of LLM - don't try to load it later during requests
             app.state._llm_lazy_load_disabled = True
@@ -2017,7 +2404,9 @@ def create_app() -> FastAPI:
         return pos * avg
 
     @app.post("/release_task")
-    async def create_music_generate_job(request: Request, authorization: Optional[str] = Header(None)):
+    async def create_music_generate_job(
+        request: Request, authorization: Optional[str] = Header(None)
+    ):
         content_type = (request.headers.get("content-type") or "").lower()
         temp_files: list[str] = []
 
@@ -2076,20 +2465,24 @@ def create_app() -> FastAPI:
         if content_type.startswith("application/json"):
             body = await request.json()
             if not isinstance(body, dict):
-                raise HTTPException(status_code=400, detail="JSON payload must be an object")
+                raise HTTPException(
+                    status_code=400, detail="JSON payload must be an object"
+                )
             verify_token_from_request(body, authorization)
             req = _build_request(RequestParser(body))
 
         elif content_type.endswith("+json"):
             body = await request.json()
             if not isinstance(body, dict):
-                raise HTTPException(status_code=400, detail="JSON payload must be an object")
+                raise HTTPException(
+                    status_code=400, detail="JSON payload must be an object"
+                )
             verify_token_from_request(body, authorization)
             req = _build_request(RequestParser(body))
 
         elif content_type.startswith("multipart/form-data"):
             form = await request.form()
-            form_dict = {k: v for k, v in form.items() if not hasattr(v, 'read')}
+            form_dict = {k: v for k, v in form.items() if not hasattr(v, "read")}
             verify_token_from_request(form_dict, authorization)
 
             # Support both naming conventions: ref_audio/reference_audio, ctx_audio/src_audio
@@ -2100,16 +2493,30 @@ def create_app() -> FastAPI:
             src_audio_path = None
 
             if isinstance(ref_up, StarletteUploadFile):
-                reference_audio_path = await _save_upload_to_temp(ref_up, prefix="ref_audio")
+                reference_audio_path = await _save_upload_to_temp(
+                    ref_up, prefix="ref_audio"
+                )
                 temp_files.append(reference_audio_path)
             else:
-                reference_audio_path = str(form.get("ref_audio_path") or form.get("reference_audio_path") or "").strip() or None
+                reference_audio_path = (
+                    str(
+                        form.get("ref_audio_path")
+                        or form.get("reference_audio_path")
+                        or ""
+                    ).strip()
+                    or None
+                )
 
             if isinstance(ctx_up, StarletteUploadFile):
                 src_audio_path = await _save_upload_to_temp(ctx_up, prefix="ctx_audio")
                 temp_files.append(src_audio_path)
             else:
-                src_audio_path = str(form.get("ctx_audio_path") or form.get("src_audio_path") or "").strip() or None
+                src_audio_path = (
+                    str(
+                        form.get("ctx_audio_path") or form.get("src_audio_path") or ""
+                    ).strip()
+                    or None
+                )
 
             req = _build_request(
                 RequestParser(dict(form)),
@@ -2121,8 +2528,18 @@ def create_app() -> FastAPI:
             form = await request.form()
             form_dict = dict(form)
             verify_token_from_request(form_dict, authorization)
-            reference_audio_path = str(form.get("ref_audio_path") or form.get("reference_audio_path") or "").strip() or None
-            src_audio_path = str(form.get("ctx_audio_path") or form.get("src_audio_path") or "").strip() or None
+            reference_audio_path = (
+                str(
+                    form.get("ref_audio_path") or form.get("reference_audio_path") or ""
+                ).strip()
+                or None
+            )
+            src_audio_path = (
+                str(
+                    form.get("ctx_audio_path") or form.get("src_audio_path") or ""
+                ).strip()
+                or None
+            )
             req = _build_request(
                 RequestParser(form_dict),
                 reference_audio_path=reference_audio_path,
@@ -2140,7 +2557,9 @@ def create_app() -> FastAPI:
                         verify_token_from_request(body, authorization)
                         req = _build_request(RequestParser(body))
                     else:
-                        raise HTTPException(status_code=400, detail="JSON payload must be an object")
+                        raise HTTPException(
+                            status_code=400, detail="JSON payload must be an object"
+                        )
                 except HTTPException:
                     raise
                 except Exception:
@@ -2150,11 +2569,28 @@ def create_app() -> FastAPI:
                     )
             # Best-effort: parse key=value bodies even if Content-Type is missing.
             elif raw_stripped and b"=" in raw:
-                parsed = urllib.parse.parse_qs(raw.decode("utf-8"), keep_blank_values=True)
-                flat = {k: (v[0] if isinstance(v, list) and v else v) for k, v in parsed.items()}
+                parsed = urllib.parse.parse_qs(
+                    raw.decode("utf-8"), keep_blank_values=True
+                )
+                flat = {
+                    k: (v[0] if isinstance(v, list) and v else v)
+                    for k, v in parsed.items()
+                }
                 verify_token_from_request(flat, authorization)
-                reference_audio_path = str(flat.get("ref_audio_path") or flat.get("reference_audio_path") or "").strip() or None
-                src_audio_path = str(flat.get("ctx_audio_path") or flat.get("src_audio_path") or "").strip() or None
+                reference_audio_path = (
+                    str(
+                        flat.get("ref_audio_path")
+                        or flat.get("reference_audio_path")
+                        or ""
+                    ).strip()
+                    or None
+                )
+                src_audio_path = (
+                    str(
+                        flat.get("ctx_audio_path") or flat.get("src_audio_path") or ""
+                    ).strip()
+                    or None
+                )
                 req = _build_request(
                     RequestParser(flat),
                     reference_audio_path=reference_audio_path,
@@ -2168,6 +2604,12 @@ def create_app() -> FastAPI:
                         "use application/json, application/x-www-form-urlencoded, or multipart/form-data"
                     ),
                 )
+
+        # Validate audio file paths (string inputs bypass upload validation)
+        if req.reference_audio_path:
+            _validate_audio_file_path(req.reference_audio_path)
+        if req.src_audio_path:
+            _validate_audio_file_path(req.src_audio_path)
 
         rec = store.create()
 
@@ -2189,10 +2631,14 @@ def create_app() -> FastAPI:
             position = len(app.state.pending_ids)
 
         await q.put((rec.job_id, req))
-        return _wrap_response({"task_id": rec.job_id, "status": "queued", "queue_position": position})
+        return _wrap_response(
+            {"task_id": rec.job_id, "status": "queued", "queue_position": position}
+        )
 
     @app.post("/query_result")
-    async def query_result(request: Request, authorization: Optional[str] = Header(None)):
+    async def query_result(
+        request: Request, authorization: Optional[str] = Header(None)
+    ):
         """Batch query job results"""
         content_type = (request.headers.get("content-type") or "").lower()
 
@@ -2214,7 +2660,7 @@ def create_app() -> FastAPI:
             except Exception:
                 task_id_list = []
 
-        local_cache = getattr(app.state, 'local_cache', None)
+        local_cache = getattr(app.state, "local_cache", None)
         data_list = []
         current_time = time.time()
 
@@ -2231,79 +2677,113 @@ def create_app() -> FastAPI:
                         data_json = []
 
                     if len(data_json) <= 0:
-                        data_list.append({"task_id": task_id, "result": data, "status": 2})
+                        data_list.append(
+                            {"task_id": task_id, "result": data, "status": 2}
+                        )
                     else:
                         status = data_json[0].get("status")
                         create_time = data_json[0].get("create_time", 0)
-                        if status == 0 and (current_time - create_time) > TASK_TIMEOUT_SECONDS:
-                            data_list.append({"task_id": task_id, "result": data, "status": 2})
+                        if (
+                            status == 0
+                            and (current_time - create_time) > TASK_TIMEOUT_SECONDS
+                        ):
+                            data_list.append(
+                                {"task_id": task_id, "result": data, "status": 2}
+                            )
                         else:
-                            data_list.append({
-                                "task_id": task_id,
-                                "result": data,
-                                "status": int(status) if status is not None else 1,
-                                "progress_text": log_buffer.last_message
-                            })
+                            data_list.append(
+                                {
+                                    "task_id": task_id,
+                                    "result": data,
+                                    "status": int(status) if status is not None else 1,
+                                    "progress_text": log_buffer.last_message,
+                                }
+                            )
                     continue
 
             # Fallback to job_store query
             rec = store.get(task_id)
             if rec:
-                env = getattr(rec, 'env', 'development')
+                env = getattr(rec, "env", "development")
                 create_time = rec.created_at
                 status_int = _map_status(rec.status)
 
                 if rec.result and rec.status == "succeeded":
                     # Check if it's a "Full Analysis" result
-                    if rec.result.get("status_message") == "Full Hardware Analysis Success":
-                         result_data = [rec.result]
+                    if (
+                        rec.result.get("status_message")
+                        == "Full Hardware Analysis Success"
+                    ):
+                        result_data = [rec.result]
                     else:
                         audio_paths = rec.result.get("audio_paths", [])
                         metas = rec.result.get("metas", {}) or {}
-                        result_data = [
-                            {
-                                "file": p, "wave": "", "status": status_int,
-                                "create_time": int(create_time), "env": env,
-                                "prompt": metas.get("caption", ""),
-                                "lyrics": metas.get("lyrics", ""),
-                                "metas": {
-                                    "bpm": metas.get("bpm"),
-                                    "duration": metas.get("duration"),
-                                    "genres": metas.get("genres", ""),
-                                    "keyscale": metas.get("keyscale", ""),
-                                    "timesignature": metas.get("timesignature", ""),
+                        result_data = (
+                            [
+                                {
+                                    "file": p,
+                                    "wave": "",
+                                    "status": status_int,
+                                    "create_time": int(create_time),
+                                    "env": env,
+                                    "prompt": metas.get("caption", ""),
+                                    "lyrics": metas.get("lyrics", ""),
+                                    "metas": {
+                                        "bpm": metas.get("bpm"),
+                                        "duration": metas.get("duration"),
+                                        "genres": metas.get("genres", ""),
+                                        "keyscale": metas.get("keyscale", ""),
+                                        "timesignature": metas.get("timesignature", ""),
+                                    },
                                 }
-                            }
-                            for p in audio_paths
-                        ] if audio_paths else [{
-                            "file": "", "wave": "", "status": status_int,
-                            "create_time": int(create_time), "env": env,
-                            "prompt": metas.get("caption", ""),
-                            "lyrics": metas.get("lyrics", ""),
-                            "metas": {
-                                "bpm": metas.get("bpm"),
-                                "duration": metas.get("duration"),
-                                "genres": metas.get("genres", ""),
-                                "keyscale": metas.get("keyscale", ""),
-                                "timesignature": metas.get("timesignature", ""),
-                            }
-                        }]
+                                for p in audio_paths
+                            ]
+                            if audio_paths
+                            else [
+                                {
+                                    "file": "",
+                                    "wave": "",
+                                    "status": status_int,
+                                    "create_time": int(create_time),
+                                    "env": env,
+                                    "prompt": metas.get("caption", ""),
+                                    "lyrics": metas.get("lyrics", ""),
+                                    "metas": {
+                                        "bpm": metas.get("bpm"),
+                                        "duration": metas.get("duration"),
+                                        "genres": metas.get("genres", ""),
+                                        "keyscale": metas.get("keyscale", ""),
+                                        "timesignature": metas.get("timesignature", ""),
+                                    },
+                                }
+                            ]
+                        )
                 else:
-                    result_data = [{
-                        "file": "", "wave": "", "status": status_int,
-                        "create_time": int(create_time), "env": env,
-                        "prompt": "", "lyrics": "",
-                        "metas": {},
-                        "error": rec.error if rec.error else None,
-                    }]
+                    result_data = [
+                        {
+                            "file": "",
+                            "wave": "",
+                            "status": status_int,
+                            "create_time": int(create_time),
+                            "env": env,
+                            "prompt": "",
+                            "lyrics": "",
+                            "metas": {},
+                            "error": rec.error if rec.error else None,
+                        }
+                    ]
 
-                current_log = log_buffer.last_message if status_int == 0 else rec.progress_text
-                data_list.append({
-                    "task_id": task_id,
-                    "result": json.dumps(result_data, ensure_ascii=False),
-                    "status": status_int,
-                    "progress_text": current_log
-                })
+                current_log = (
+                    log_buffer.last_message if status_int == 0 else rec.progress_text
+                )
+                data_list.append(
+                    {
+                        "task_id": task_id,
+                        "result": json.dumps(result_data, ensure_ascii=False),
+                        "status": status_int,
+                        "progress_text": current_log,
+                    }
+                )
             else:
                 data_list.append({"task_id": task_id, "result": "[]", "status": 0})
 
@@ -2312,64 +2792,80 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health_check():
         """Health check endpoint for service status."""
-        return _wrap_response({
-            "status": "ok",
-            "service": "ACE-Step API",
-            "version": "1.0",
-        })
+        return _wrap_response(
+            {
+                "status": "ok",
+                "service": "ACE-Step API",
+                "version": "1.0",
+            }
+        )
 
     @app.get("/v1/stats")
     async def get_stats(_: None = Depends(verify_api_key)):
         """Get server statistics including job store stats."""
         job_stats = store.get_stats()
         async with app.state.stats_lock:
-            avg_job_seconds = getattr(app.state, "avg_job_seconds", INITIAL_AVG_JOB_SECONDS)
-        return _wrap_response({
-            "jobs": job_stats,
-            "queue_size": app.state.job_queue.qsize(),
-            "queue_maxsize": QUEUE_MAXSIZE,
-            "avg_job_seconds": avg_job_seconds,
-        })
+            avg_job_seconds = getattr(
+                app.state, "avg_job_seconds", INITIAL_AVG_JOB_SECONDS
+            )
+        return _wrap_response(
+            {
+                "jobs": job_stats,
+                "queue_size": app.state.job_queue.qsize(),
+                "queue_maxsize": QUEUE_MAXSIZE,
+                "avg_job_seconds": avg_job_seconds,
+            }
+        )
 
     @app.get("/v1/models")
     async def list_models(_: None = Depends(verify_api_key)):
         """List available DiT models."""
         models = []
-        
+
         # Primary model (always available if initialized)
         if getattr(app.state, "_initialized", False):
             primary_model = _get_model_name(app.state._config_path)
             if primary_model:
-                models.append({
-                    "name": primary_model,
-                    "is_default": True,
-                })
-        
+                models.append(
+                    {
+                        "name": primary_model,
+                        "is_default": True,
+                    }
+                )
+
         # Secondary model
         if getattr(app.state, "_initialized2", False) and app.state._config_path2:
             secondary_model = _get_model_name(app.state._config_path2)
             if secondary_model:
-                models.append({
-                    "name": secondary_model,
-                    "is_default": False,
-                })
-        
+                models.append(
+                    {
+                        "name": secondary_model,
+                        "is_default": False,
+                    }
+                )
+
         # Third model
         if getattr(app.state, "_initialized3", False) and app.state._config_path3:
             third_model = _get_model_name(app.state._config_path3)
             if third_model:
-                models.append({
-                    "name": third_model,
-                    "is_default": False,
-                })
-        
-        return _wrap_response({
-            "models": models,
-            "default_model": models[0]["name"] if models else None,
-        })
+                models.append(
+                    {
+                        "name": third_model,
+                        "is_default": False,
+                    }
+                )
+
+        return _wrap_response(
+            {
+                "models": models,
+                "default_model": models[0]["name"] if models else None,
+            }
+        )
 
     @app.post("/create_random_sample")
-    async def create_random_sample_endpoint(request: Request, authorization: Optional[str] = Header(None)):
+    async def create_random_sample_endpoint(
+        request: Request, authorization: Optional[str] = Header(None)
+    ):
         """
         Get random sample parameters from pre-loaded example data.
 
@@ -2398,7 +2894,9 @@ def create_app() -> FastAPI:
         return _wrap_response(random_example)
 
     @app.post("/format_input")
-    async def format_input_endpoint(request: Request, authorization: Optional[str] = Header(None)):
+    async def format_input_endpoint(
+        request: Request, authorization: Optional[str] = Header(None)
+    ):
         """
         Format and enhance lyrics/caption via LLM.
 
@@ -2420,18 +2918,23 @@ def create_app() -> FastAPI:
         with app.state._llm_init_lock:
             if not getattr(app.state, "_llm_initialized", False):
                 if getattr(app.state, "_llm_init_error", None):
-                    raise HTTPException(status_code=500, detail=f"LLM init failed: {app.state._llm_init_error}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"LLM init failed: {app.state._llm_init_error}",
+                    )
 
                 # Check if lazy loading is disabled
                 if getattr(app.state, "_llm_lazy_load_disabled", False):
                     raise HTTPException(
                         status_code=503,
-                        detail="LLM not initialized. Set ACESTEP_INIT_LLM=true in .env to enable."
+                        detail="LLM not initialized. Set ACESTEP_INIT_LLM=true in .env to enable.",
                     )
 
                 project_root = _get_project_root()
                 checkpoint_dir = os.path.join(project_root, "checkpoints")
-                lm_model_path = os.getenv("ACESTEP_LM_MODEL_PATH", "acestep-5Hz-lm-0.6B").strip()
+                lm_model_path = os.getenv(
+                    "ACESTEP_LM_MODEL_PATH", "acestep-5Hz-lm-0.6B"
+                ).strip()
                 backend = os.getenv("ACESTEP_LM_BACKEND", "vllm").strip().lower()
                 if backend not in {"vllm", "pt"}:
                     backend = "vllm"
@@ -2442,9 +2945,13 @@ def create_app() -> FastAPI:
                     try:
                         _ensure_model_downloaded(lm_model_name, checkpoint_dir)
                     except Exception as e:
-                        print(f"[API Server] Warning: Failed to download LM model {lm_model_name}: {e}")
+                        print(
+                            f"[API Server] Warning: Failed to download LM model {lm_model_name}: {e}"
+                        )
 
-                lm_device = os.getenv("ACESTEP_LM_DEVICE", os.getenv("ACESTEP_DEVICE", "auto"))
+                lm_device = os.getenv(
+                    "ACESTEP_LM_DEVICE", os.getenv("ACESTEP_DEVICE", "auto")
+                )
                 lm_offload = _env_bool("ACESTEP_LM_OFFLOAD_TO_CPU", False)
 
                 h: AceStepHandler = app.state.handler
@@ -2458,7 +2965,9 @@ def create_app() -> FastAPI:
                 )
                 if not ok:
                     app.state._llm_init_error = status
-                    raise HTTPException(status_code=500, detail=f"LLM init failed: {status}")
+                    raise HTTPException(
+                        status_code=500, detail=f"LLM init failed: {status}"
+                    )
                 app.state._llm_initialized = True
 
         # Parse parameters
@@ -2480,21 +2989,23 @@ def create_app() -> FastAPI:
         duration = _to_float(param_obj.get("duration"))
         bpm = _to_int(param_obj.get("bpm"))
         key_scale = param_obj.get("key", "") or param_obj.get("key_scale", "") or ""
-        time_signature = param_obj.get("time_signature", "") or body.get("time_signature", "") or ""
+        time_signature = (
+            param_obj.get("time_signature", "") or body.get("time_signature", "") or ""
+        )
         language = param_obj.get("language", "") or ""
 
         # Build user_metadata for format_sample
         user_metadata_for_format = {}
         if bpm is not None:
-            user_metadata_for_format['bpm'] = bpm
+            user_metadata_for_format["bpm"] = bpm
         if duration is not None and duration > 0:
-            user_metadata_for_format['duration'] = int(duration)
+            user_metadata_for_format["duration"] = int(duration)
         if key_scale:
-            user_metadata_for_format['keyscale'] = key_scale
+            user_metadata_for_format["keyscale"] = key_scale
         if time_signature:
-            user_metadata_for_format['timesignature'] = time_signature
+            user_metadata_for_format["timesignature"] = time_signature
         if language and language != "unknown":
-            user_metadata_for_format['language'] = language
+            user_metadata_for_format["language"] = language
 
         # Call format_sample
         try:
@@ -2502,14 +3013,18 @@ def create_app() -> FastAPI:
                 llm_handler=llm,
                 caption=prompt,
                 lyrics=lyrics,
-                user_metadata=user_metadata_for_format if user_metadata_for_format else None,
+                user_metadata=user_metadata_for_format
+                if user_metadata_for_format
+                else None,
                 temperature=temperature,
                 use_constrained_decoding=True,
             )
 
             if not format_result.success:
                 error_msg = format_result.error or format_result.status_message
-                return _wrap_response(None, code=500, error=f"format_sample failed: {error_msg}")
+                return _wrap_response(
+                    None, code=500, error=f"format_sample failed: {error_msg}"
+                )
 
             # Use formatted results or fallback to original
             result_caption = format_result.caption or prompt
@@ -2519,17 +3034,21 @@ def create_app() -> FastAPI:
             result_key_scale = format_result.keyscale or key_scale
             result_time_signature = format_result.timesignature or time_signature
 
-            return _wrap_response({
-                "caption": result_caption,
-                "lyrics": result_lyrics,
-                "bpm": result_bpm,
-                "key_scale": result_key_scale,
-                "time_signature": result_time_signature,
-                "duration": result_duration,
-                "vocal_language": format_result.language or language or "unknown",
-            })
+            return _wrap_response(
+                {
+                    "caption": result_caption,
+                    "lyrics": result_lyrics,
+                    "bpm": result_bpm,
+                    "key_scale": result_key_scale,
+                    "time_signature": result_time_signature,
+                    "duration": result_duration,
+                    "vocal_language": format_result.language or language or "unknown",
+                }
+            )
         except Exception as e:
-            return _wrap_response(None, code=500, error=f"format_sample error: {str(e)}")
+            return _wrap_response(
+                None, code=500, error=f"format_sample error: {str(e)}"
+            )
 
     # =========================================================================
     # LM-Only Endpoints: Direct access to the 5Hz Language Model
@@ -2542,17 +3061,22 @@ def create_app() -> FastAPI:
         with app.state._llm_init_lock:
             if not getattr(app.state, "_llm_initialized", False):
                 if getattr(app.state, "_llm_init_error", None):
-                    raise HTTPException(status_code=500, detail=f"LLM init failed: {app.state._llm_init_error}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"LLM init failed: {app.state._llm_init_error}",
+                    )
 
                 if getattr(app.state, "_llm_lazy_load_disabled", False):
                     raise HTTPException(
                         status_code=503,
-                        detail="LLM not initialized. Set ACESTEP_INIT_LLM=true in .env to enable."
+                        detail="LLM not initialized. Set ACESTEP_INIT_LLM=true in .env to enable.",
                     )
 
                 project_root = _get_project_root()
                 checkpoint_dir = os.path.join(project_root, "checkpoints")
-                lm_model_path = os.getenv("ACESTEP_LM_MODEL_PATH", "acestep-5Hz-lm-0.6B").strip()
+                lm_model_path = os.getenv(
+                    "ACESTEP_LM_MODEL_PATH", "acestep-5Hz-lm-0.6B"
+                ).strip()
                 backend = os.getenv("ACESTEP_LM_BACKEND", "vllm").strip().lower()
                 if backend not in {"vllm", "pt"}:
                     backend = "vllm"
@@ -2562,9 +3086,13 @@ def create_app() -> FastAPI:
                     try:
                         _ensure_model_downloaded(lm_model_name, checkpoint_dir)
                     except Exception as e:
-                        print(f"[API Server] Warning: Failed to download LM model {lm_model_name}: {e}")
+                        print(
+                            f"[API Server] Warning: Failed to download LM model {lm_model_name}: {e}"
+                        )
 
-                lm_device = os.getenv("ACESTEP_LM_DEVICE", os.getenv("ACESTEP_DEVICE", "auto"))
+                lm_device = os.getenv(
+                    "ACESTEP_LM_DEVICE", os.getenv("ACESTEP_DEVICE", "auto")
+                )
                 lm_offload = _env_bool("ACESTEP_LM_OFFLOAD_TO_CPU", False)
 
                 h: AceStepHandler = app.state.handler
@@ -2578,13 +3106,17 @@ def create_app() -> FastAPI:
                 )
                 if not ok:
                     app.state._llm_init_error = status
-                    raise HTTPException(status_code=500, detail=f"LLM init failed: {status}")
+                    raise HTTPException(
+                        status_code=500, detail=f"LLM init failed: {status}"
+                    )
                 app.state._llm_initialized = True
 
         return llm
 
     @app.post("/lm/understand")
-    async def lm_understand_endpoint(request: Request, authorization: Optional[str] = Header(None)):
+    async def lm_understand_endpoint(
+        request: Request, authorization: Optional[str] = Header(None)
+    ):
         """
         Understand audio: upload an audio file and get back metadata + lyrics.
 
@@ -2604,16 +3136,22 @@ def create_app() -> FastAPI:
             # Parse request
             if content_type.startswith("multipart/form-data"):
                 form = await request.form()
-                form_dict = {k: v for k, v in form.items() if not hasattr(v, 'read')}
+                form_dict = {k: v for k, v in form.items() if not hasattr(v, "read")}
                 verify_token_from_request(form_dict, authorization)
 
                 # Accept audio file upload
-                audio_upload = form.get("audio") or form.get("audio_file") or form.get("src_audio")
+                audio_upload = (
+                    form.get("audio") or form.get("audio_file") or form.get("src_audio")
+                )
                 audio_codes = str(form_dict.get("audio_codes", "") or "").strip()
-                audio_file_path = str(form_dict.get("audio_path", "") or "").strip() or None
+                audio_file_path = (
+                    str(form_dict.get("audio_path", "") or "").strip() or None
+                )
 
                 if isinstance(audio_upload, StarletteUploadFile):
-                    audio_file_path = await _save_upload_to_temp(audio_upload, prefix="lm_understand")
+                    audio_file_path = await _save_upload_to_temp(
+                        audio_upload, prefix="lm_understand"
+                    )
                     temp_files.append(audio_file_path)
 
                 # LM generation parameters
@@ -2629,7 +3167,9 @@ def create_app() -> FastAPI:
                 except Exception:
                     body = {}
                 if not isinstance(body, dict):
-                    raise HTTPException(status_code=400, detail="JSON payload must be an object")
+                    raise HTTPException(
+                        status_code=400, detail="JSON payload must be an object"
+                    )
                 verify_token_from_request(body, authorization)
 
                 audio_codes = str(body.get("audio_codes", "") or "").strip()
@@ -2640,7 +3180,10 @@ def create_app() -> FastAPI:
                 repetition_penalty = _to_float(body.get("repetition_penalty"), 1.0)
                 seed = _to_int(body.get("seed"))
             else:
-                raise HTTPException(status_code=415, detail="Unsupported Content-Type. Use multipart/form-data or application/json.")
+                raise HTTPException(
+                    status_code=415,
+                    detail="Unsupported Content-Type. Use multipart/form-data or application/json.",
+                )
 
             # Normalize sampling params
             top_k = top_k_val if top_k_val and top_k_val > 0 else None
@@ -2649,22 +3192,38 @@ def create_app() -> FastAPI:
             # Set random seed if requested
             if seed is not None and seed >= 0:
                 import torch
+
                 torch.manual_seed(seed)
                 random.seed(seed)
 
             # If we have an audio file but no codes, convert audio -> codes via DiT VAE
             if not audio_codes and audio_file_path:
+                # Validate the audio file path (extension + magic bytes)
+                _validate_audio_file_path(audio_file_path)
+
                 if getattr(app.state, "_init_error", None):
-                    raise HTTPException(status_code=500, detail=f"DiT model not initialized: {app.state._init_error}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"DiT model not initialized: {app.state._init_error}",
+                    )
                 if not getattr(app.state, "_initialized", False):
-                    raise HTTPException(status_code=503, detail="DiT model not yet initialized. Please wait for startup to complete.")
+                    raise HTTPException(
+                        status_code=503,
+                        detail="DiT model not yet initialized. Please wait for startup to complete.",
+                    )
                 h: AceStepHandler = app.state.handler
                 audio_codes = h.convert_src_audio_to_codes(audio_file_path)
                 if not audio_codes or audio_codes.startswith("\u274c"):
-                    return _wrap_response(None, code=400, error=f"Audio encoding failed: {audio_codes}")
+                    return _wrap_response(
+                        None, code=400, error=f"Audio encoding failed: {audio_codes}"
+                    )
 
             if not audio_codes:
-                return _wrap_response(None, code=400, error="No audio provided. Upload an audio file or provide audio_codes.")
+                return _wrap_response(
+                    None,
+                    code=400,
+                    error="No audio provided. Upload an audio file or provide audio_codes.",
+                )
 
             # Ensure LLM is ready
             llm = _ensure_llm_for_endpoint()
@@ -2681,24 +3240,32 @@ def create_app() -> FastAPI:
             )
 
             if not result.success:
-                return _wrap_response(None, code=500, error=f"Understanding failed: {result.error or result.status_message}")
+                return _wrap_response(
+                    None,
+                    code=500,
+                    error=f"Understanding failed: {result.error or result.status_message}",
+                )
 
-            return _wrap_response({
-                "caption": result.caption,
-                "lyrics": result.lyrics,
-                "bpm": result.bpm,
-                "duration": result.duration,
-                "key_scale": result.keyscale,
-                "language": result.language,
-                "time_signature": result.timesignature,
-                "seed": seed,
-            })
+            return _wrap_response(
+                {
+                    "caption": result.caption,
+                    "lyrics": result.lyrics,
+                    "bpm": result.bpm,
+                    "duration": result.duration,
+                    "key_scale": result.keyscale,
+                    "language": result.language,
+                    "time_signature": result.timesignature,
+                    "seed": seed,
+                }
+            )
 
         except HTTPException:
             raise
         except Exception as e:
             logger.exception("lm/understand error")
-            return _wrap_response(None, code=500, error=f"lm/understand error: {str(e)}")
+            return _wrap_response(
+                None, code=500, error=f"lm/understand error: {str(e)}"
+            )
         finally:
             for tf in temp_files:
                 try:
@@ -2707,7 +3274,9 @@ def create_app() -> FastAPI:
                     pass
 
     @app.post("/lm/inspire")
-    async def lm_inspire_endpoint(request: Request, authorization: Optional[str] = Header(None)):
+    async def lm_inspire_endpoint(
+        request: Request, authorization: Optional[str] = Header(None)
+    ):
         """
         Inspiration mode: generate caption, lyrics, and metadata from a
         high-level natural language music description.
@@ -2729,15 +3298,31 @@ def create_app() -> FastAPI:
             body = {k: v for k, v in form.items()}
 
         if not isinstance(body, dict):
-            raise HTTPException(status_code=400, detail="JSON payload must be an object")
+            raise HTTPException(
+                status_code=400, detail="JSON payload must be an object"
+            )
         verify_token_from_request(body, authorization)
 
-        query = str(body.get("query", "") or body.get("description", "") or body.get("prompt", "") or "").strip()
+        query = str(
+            body.get("query", "")
+            or body.get("description", "")
+            or body.get("prompt", "")
+            or ""
+        ).strip()
         if not query:
-            return _wrap_response(None, code=400, error="Missing 'query' parameter. Provide a music description.")
+            return _wrap_response(
+                None,
+                code=400,
+                error="Missing 'query' parameter. Provide a music description.",
+            )
 
         instrumental = _to_bool(body.get("instrumental"), False)
-        vocal_language = str(body.get("vocal_language", "") or body.get("language", "") or "").strip() or None
+        vocal_language = (
+            str(
+                body.get("vocal_language", "") or body.get("language", "") or ""
+            ).strip()
+            or None
+        )
         temperature = _to_float(body.get("temperature"), 0.85)
         top_k_val = _to_int(body.get("top_k"))
         top_p_val = _to_float(body.get("top_p"))
@@ -2751,6 +3336,7 @@ def create_app() -> FastAPI:
         # Set random seed if requested
         if seed is not None and seed >= 0:
             import torch
+
             torch.manual_seed(seed)
             random.seed(seed)
 
@@ -2770,19 +3356,25 @@ def create_app() -> FastAPI:
             )
 
             if not result.success:
-                return _wrap_response(None, code=500, error=f"Inspiration failed: {result.error or result.status_message}")
+                return _wrap_response(
+                    None,
+                    code=500,
+                    error=f"Inspiration failed: {result.error or result.status_message}",
+                )
 
-            return _wrap_response({
-                "caption": result.caption,
-                "lyrics": result.lyrics,
-                "bpm": result.bpm,
-                "duration": result.duration,
-                "key_scale": result.keyscale,
-                "language": result.language,
-                "time_signature": result.timesignature,
-                "instrumental": result.instrumental,
-                "seed": seed,
-            })
+            return _wrap_response(
+                {
+                    "caption": result.caption,
+                    "lyrics": result.lyrics,
+                    "bpm": result.bpm,
+                    "duration": result.duration,
+                    "key_scale": result.keyscale,
+                    "language": result.language,
+                    "time_signature": result.timesignature,
+                    "instrumental": result.instrumental,
+                    "seed": seed,
+                }
+            )
 
         except HTTPException:
             raise
@@ -2791,7 +3383,9 @@ def create_app() -> FastAPI:
             return _wrap_response(None, code=500, error=f"lm/inspire error: {str(e)}")
 
     @app.post("/lm/format")
-    async def lm_format_endpoint(request: Request, authorization: Optional[str] = Header(None)):
+    async def lm_format_endpoint(
+        request: Request, authorization: Optional[str] = Header(None)
+    ):
         """
         Format/enhance user-provided caption and lyrics via the 5Hz Language Model.
 
@@ -2813,14 +3407,20 @@ def create_app() -> FastAPI:
             body = {k: v for k, v in form.items()}
 
         if not isinstance(body, dict):
-            raise HTTPException(status_code=400, detail="JSON payload must be an object")
+            raise HTTPException(
+                status_code=400, detail="JSON payload must be an object"
+            )
         verify_token_from_request(body, authorization)
 
         prompt = str(body.get("prompt", "") or body.get("caption", "") or "").strip()
         lyrics = str(body.get("lyrics", "") or "").strip()
 
         if not prompt and not lyrics:
-            return _wrap_response(None, code=400, error="Missing 'prompt' and/or 'lyrics'. Provide at least one.")
+            return _wrap_response(
+                None,
+                code=400,
+                error="Missing 'prompt' and/or 'lyrics'. Provide at least one.",
+            )
 
         temperature = _to_float(body.get("temperature"), 0.85)
         top_k_val = _to_int(body.get("top_k"))
@@ -2835,6 +3435,7 @@ def create_app() -> FastAPI:
         # Set random seed if requested
         if seed is not None and seed >= 0:
             import torch
+
             torch.manual_seed(seed)
             random.seed(seed)
 
@@ -2842,19 +3443,25 @@ def create_app() -> FastAPI:
         user_metadata = {}
         bpm = _to_int(body.get("bpm"))
         if bpm is not None and bpm > 0:
-            user_metadata['bpm'] = bpm
+            user_metadata["bpm"] = bpm
         duration = _to_float(body.get("duration"))
         if duration is not None and duration > 0:
-            user_metadata['duration'] = int(duration)
-        key_scale = str(body.get("key_scale", "") or body.get("keyscale", "") or "").strip()
+            user_metadata["duration"] = int(duration)
+        key_scale = str(
+            body.get("key_scale", "") or body.get("keyscale", "") or ""
+        ).strip()
         if key_scale:
-            user_metadata['keyscale'] = key_scale
-        time_signature = str(body.get("time_signature", "") or body.get("timesignature", "") or "").strip()
+            user_metadata["keyscale"] = key_scale
+        time_signature = str(
+            body.get("time_signature", "") or body.get("timesignature", "") or ""
+        ).strip()
         if time_signature:
-            user_metadata['timesignature'] = time_signature
-        language = str(body.get("vocal_language", "") or body.get("language", "") or "").strip()
+            user_metadata["timesignature"] = time_signature
+        language = str(
+            body.get("vocal_language", "") or body.get("language", "") or ""
+        ).strip()
         if language and language != "unknown":
-            user_metadata['language'] = language
+            user_metadata["language"] = language
 
         try:
             llm = _ensure_llm_for_endpoint()
@@ -2872,18 +3479,24 @@ def create_app() -> FastAPI:
             )
 
             if not result.success:
-                return _wrap_response(None, code=500, error=f"Format failed: {result.error or result.status_message}")
+                return _wrap_response(
+                    None,
+                    code=500,
+                    error=f"Format failed: {result.error or result.status_message}",
+                )
 
-            return _wrap_response({
-                "caption": result.caption,
-                "lyrics": result.lyrics,
-                "bpm": result.bpm,
-                "duration": result.duration,
-                "key_scale": result.keyscale,
-                "language": result.language,
-                "time_signature": result.timesignature,
-                "seed": seed,
-            })
+            return _wrap_response(
+                {
+                    "caption": result.caption,
+                    "lyrics": result.lyrics,
+                    "bpm": result.bpm,
+                    "duration": result.duration,
+                    "key_scale": result.keyscale,
+                    "language": result.language,
+                    "time_signature": result.timesignature,
+                    "seed": seed,
+                }
+            )
 
         except HTTPException:
             raise
@@ -2899,8 +3512,13 @@ def create_app() -> FastAPI:
         # Security: Validate path is within allowed directory to prevent path traversal
         resolved_path = os.path.realpath(path)
         allowed_dir = os.path.realpath(request.app.state.temp_audio_dir)
-        if not resolved_path.startswith(allowed_dir + os.sep) and resolved_path != allowed_dir:
-            raise HTTPException(status_code=403, detail="Access denied: path outside allowed directory")
+        if (
+            not resolved_path.startswith(allowed_dir + os.sep)
+            and resolved_path != allowed_dir
+        ):
+            raise HTTPException(
+                status_code=403, detail="Access denied: path outside allowed directory"
+            )
         if not os.path.exists(resolved_path):
             raise HTTPException(status_code=404, detail="Audio file not found")
 
@@ -2955,7 +3573,7 @@ def main() -> None:
         action="store_true",
         default=_env_bool("ACESTEP_INIT_LLM", False),
         help="Initialize LLM even if GPU memory is insufficient (may cause OOM). "
-             "Can also be set via ACESTEP_INIT_LLM=true environment variable.",
+        "Can also be set via ACESTEP_INIT_LLM=true environment variable.",
     )
     parser.add_argument(
         "--lm-model-path",
@@ -2992,6 +3610,7 @@ def main() -> None:
         reload=False,
         workers=1,
     )
+
 
 if __name__ == "__main__":
     main()
