@@ -240,4 +240,5 @@ issues/
 PortableGit/
 proxy_config.txt
 gradio_outputs/
-acestep/third_parts/vllm/.ngrok_env
+acestep/third_parts/vllm/
+.ngrok_env
