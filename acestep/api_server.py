@@ -5,6 +5,9 @@ Endpoints:
 - POST /query_result          Batch query task results
 - POST /create_random_sample  Generate random music parameters via LLM
 - POST /format_input          Format and enhance lyrics/caption via LLM
+- POST /lm/understand         Understand audio file -> metadata + lyrics (LM-only)
+- POST /lm/inspire            High-level prompt -> caption, lyrics, metadata (LM-only)
+- POST /lm/format             Enhance caption + lyrics -> structured output (LM-only)
 - GET  /v1/models             List available models
 - GET  /v1/audio              Download audio file
 - GET  /health                Health check
@@ -57,6 +60,7 @@ from acestep.inference import (
     generate_music,
     create_sample,
     format_sample,
+    understand_music,
 )
 from acestep.gradio_ui.events.results_handlers import _build_generation_info
 from acestep.gpu_config import (
@@ -2466,6 +2470,366 @@ def create_app() -> FastAPI:
             })
         except Exception as e:
             return _wrap_response(None, code=500, error=f"format_sample error: {str(e)}")
+
+    # =========================================================================
+    # LM-Only Endpoints: Direct access to the 5Hz Language Model
+    # =========================================================================
+
+    def _ensure_llm_for_endpoint() -> LLMHandler:
+        """Ensure LLM is initialized and return the handler. Raises HTTPException on failure."""
+        llm: LLMHandler = app.state.llm_handler
+
+        with app.state._llm_init_lock:
+            if not getattr(app.state, "_llm_initialized", False):
+                if getattr(app.state, "_llm_init_error", None):
+                    raise HTTPException(status_code=500, detail=f"LLM init failed: {app.state._llm_init_error}")
+
+                if getattr(app.state, "_llm_lazy_load_disabled", False):
+                    raise HTTPException(
+                        status_code=503,
+                        detail="LLM not initialized. Set ACESTEP_INIT_LLM=true in .env to enable."
+                    )
+
+                project_root = _get_project_root()
+                checkpoint_dir = os.path.join(project_root, "checkpoints")
+                lm_model_path = os.getenv("ACESTEP_LM_MODEL_PATH", "acestep-5Hz-lm-0.6B").strip()
+                backend = os.getenv("ACESTEP_LM_BACKEND", "vllm").strip().lower()
+                if backend not in {"vllm", "pt"}:
+                    backend = "vllm"
+
+                lm_model_name = _get_model_name(lm_model_path)
+                if lm_model_name:
+                    try:
+                        _ensure_model_downloaded(lm_model_name, checkpoint_dir)
+                    except Exception as e:
+                        print(f"[API Server] Warning: Failed to download LM model {lm_model_name}: {e}")
+
+                lm_device = os.getenv("ACESTEP_LM_DEVICE", os.getenv("ACESTEP_DEVICE", "auto"))
+                lm_offload = _env_bool("ACESTEP_LM_OFFLOAD_TO_CPU", False)
+
+                h: AceStepHandler = app.state.handler
+                status, ok = llm.initialize(
+                    checkpoint_dir=checkpoint_dir,
+                    lm_model_path=lm_model_path,
+                    backend=backend,
+                    device=lm_device,
+                    offload_to_cpu=lm_offload,
+                    dtype=h.dtype,
+                )
+                if not ok:
+                    app.state._llm_init_error = status
+                    raise HTTPException(status_code=500, detail=f"LLM init failed: {status}")
+                app.state._llm_initialized = True
+
+        return llm
+
+    @app.post("/lm/understand")
+    async def lm_understand_endpoint(request: Request, authorization: Optional[str] = Header(None)):
+        """
+        Understand audio: upload an audio file and get back metadata + lyrics.
+
+        This is the reverse of generation: given audio, the 5Hz Language Model
+        encodes it to semantic codes (via the DiT VAE), then generates a textual
+        description including caption, lyrics, BPM, key, duration, etc.
+
+        Accepts multipart/form-data (with audio file upload) or JSON (with
+        audio_codes string if you already have codes).
+
+        Returns parsed metadata fields directly (no async job queue).
+        """
+        content_type = (request.headers.get("content-type") or "").lower()
+        temp_files: list[str] = []
+
+        try:
+            # Parse request
+            if content_type.startswith("multipart/form-data"):
+                form = await request.form()
+                form_dict = {k: v for k, v in form.items() if not hasattr(v, 'read')}
+                verify_token_from_request(form_dict, authorization)
+
+                # Accept audio file upload
+                audio_upload = form.get("audio") or form.get("audio_file") or form.get("src_audio")
+                audio_codes = str(form_dict.get("audio_codes", "") or "").strip()
+                audio_file_path = str(form_dict.get("audio_path", "") or "").strip() or None
+
+                if isinstance(audio_upload, StarletteUploadFile):
+                    audio_file_path = await _save_upload_to_temp(audio_upload, prefix="lm_understand")
+                    temp_files.append(audio_file_path)
+
+                # LM generation parameters
+                temperature = _to_float(form_dict.get("temperature"), 0.3)
+                top_k_val = _to_int(form_dict.get("top_k"))
+                top_p_val = _to_float(form_dict.get("top_p"))
+                repetition_penalty = _to_float(form_dict.get("repetition_penalty"), 1.0)
+                seed = _to_int(form_dict.get("seed"))
+
+            elif "json" in content_type or content_type == "":
+                try:
+                    body = await request.json()
+                except Exception:
+                    body = {}
+                if not isinstance(body, dict):
+                    raise HTTPException(status_code=400, detail="JSON payload must be an object")
+                verify_token_from_request(body, authorization)
+
+                audio_codes = str(body.get("audio_codes", "") or "").strip()
+                audio_file_path = str(body.get("audio_path", "") or "").strip() or None
+                temperature = _to_float(body.get("temperature"), 0.3)
+                top_k_val = _to_int(body.get("top_k"))
+                top_p_val = _to_float(body.get("top_p"))
+                repetition_penalty = _to_float(body.get("repetition_penalty"), 1.0)
+                seed = _to_int(body.get("seed"))
+            else:
+                raise HTTPException(status_code=415, detail="Unsupported Content-Type. Use multipart/form-data or application/json.")
+
+            # Normalize sampling params
+            top_k = top_k_val if top_k_val and top_k_val > 0 else None
+            top_p = top_p_val if top_p_val and top_p_val < 1.0 else None
+
+            # Set random seed if requested
+            if seed is not None and seed >= 0:
+                import torch
+                torch.manual_seed(seed)
+                random.seed(seed)
+
+            # If we have an audio file but no codes, convert audio -> codes via DiT VAE
+            if not audio_codes and audio_file_path:
+                if getattr(app.state, "_init_error", None):
+                    raise HTTPException(status_code=500, detail=f"DiT model not initialized: {app.state._init_error}")
+                if not getattr(app.state, "_initialized", False):
+                    raise HTTPException(status_code=503, detail="DiT model not yet initialized. Please wait for startup to complete.")
+                h: AceStepHandler = app.state.handler
+                audio_codes = h.convert_src_audio_to_codes(audio_file_path)
+                if not audio_codes or audio_codes.startswith("\u274c"):
+                    return _wrap_response(None, code=400, error=f"Audio encoding failed: {audio_codes}")
+
+            if not audio_codes:
+                return _wrap_response(None, code=400, error="No audio provided. Upload an audio file or provide audio_codes.")
+
+            # Ensure LLM is ready
+            llm = _ensure_llm_for_endpoint()
+
+            # Run understanding
+            result = understand_music(
+                llm_handler=llm,
+                audio_codes=audio_codes,
+                temperature=temperature,
+                top_k=top_k,
+                top_p=top_p,
+                repetition_penalty=repetition_penalty,
+                use_constrained_decoding=True,
+            )
+
+            if not result.success:
+                return _wrap_response(None, code=500, error=f"Understanding failed: {result.error or result.status_message}")
+
+            return _wrap_response({
+                "caption": result.caption,
+                "lyrics": result.lyrics,
+                "bpm": result.bpm,
+                "duration": result.duration,
+                "key_scale": result.keyscale,
+                "language": result.language,
+                "time_signature": result.timesignature,
+                "seed": seed,
+            })
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception("lm/understand error")
+            return _wrap_response(None, code=500, error=f"lm/understand error: {str(e)}")
+        finally:
+            for tf in temp_files:
+                try:
+                    os.remove(tf)
+                except Exception:
+                    pass
+
+    @app.post("/lm/inspire")
+    async def lm_inspire_endpoint(request: Request, authorization: Optional[str] = Header(None)):
+        """
+        Inspiration mode: generate caption, lyrics, and metadata from a
+        high-level natural language music description.
+
+        Example query: "a soft Bengali love song for a quiet evening"
+
+        Returns the text that would be fed to the audio generation model,
+        without actually generating audio.
+        """
+        content_type = (request.headers.get("content-type") or "").lower()
+
+        if "json" in content_type or content_type == "":
+            try:
+                body = await request.json()
+            except Exception:
+                body = {}
+        else:
+            form = await request.form()
+            body = {k: v for k, v in form.items()}
+
+        if not isinstance(body, dict):
+            raise HTTPException(status_code=400, detail="JSON payload must be an object")
+        verify_token_from_request(body, authorization)
+
+        query = str(body.get("query", "") or body.get("description", "") or body.get("prompt", "") or "").strip()
+        if not query:
+            return _wrap_response(None, code=400, error="Missing 'query' parameter. Provide a music description.")
+
+        instrumental = _to_bool(body.get("instrumental"), False)
+        vocal_language = str(body.get("vocal_language", "") or body.get("language", "") or "").strip() or None
+        temperature = _to_float(body.get("temperature"), 0.85)
+        top_k_val = _to_int(body.get("top_k"))
+        top_p_val = _to_float(body.get("top_p"))
+        repetition_penalty = _to_float(body.get("repetition_penalty"), 1.0)
+        seed = _to_int(body.get("seed"))
+
+        # Normalize sampling params
+        top_k = top_k_val if top_k_val and top_k_val > 0 else None
+        top_p = top_p_val if top_p_val and top_p_val < 1.0 else None
+
+        # Set random seed if requested
+        if seed is not None and seed >= 0:
+            import torch
+            torch.manual_seed(seed)
+            random.seed(seed)
+
+        try:
+            llm = _ensure_llm_for_endpoint()
+
+            result = create_sample(
+                llm_handler=llm,
+                query=query,
+                instrumental=instrumental,
+                vocal_language=vocal_language,
+                temperature=temperature,
+                top_k=top_k,
+                top_p=top_p,
+                repetition_penalty=repetition_penalty,
+                use_constrained_decoding=True,
+            )
+
+            if not result.success:
+                return _wrap_response(None, code=500, error=f"Inspiration failed: {result.error or result.status_message}")
+
+            return _wrap_response({
+                "caption": result.caption,
+                "lyrics": result.lyrics,
+                "bpm": result.bpm,
+                "duration": result.duration,
+                "key_scale": result.keyscale,
+                "language": result.language,
+                "time_signature": result.timesignature,
+                "instrumental": result.instrumental,
+                "seed": seed,
+            })
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception("lm/inspire error")
+            return _wrap_response(None, code=500, error=f"lm/inspire error: {str(e)}")
+
+    @app.post("/lm/format")
+    async def lm_format_endpoint(request: Request, authorization: Optional[str] = Header(None)):
+        """
+        Format/enhance user-provided caption and lyrics via the 5Hz Language Model.
+
+        Takes rough caption + lyrics and returns an enhanced, structured version
+        with full metadata (BPM, key, duration, time signature, language).
+
+        This is useful for cleaning up user input before feeding it to audio
+        generation, or for getting the LM's interpretation of a music description.
+        """
+        content_type = (request.headers.get("content-type") or "").lower()
+
+        if "json" in content_type or content_type == "":
+            try:
+                body = await request.json()
+            except Exception:
+                body = {}
+        else:
+            form = await request.form()
+            body = {k: v for k, v in form.items()}
+
+        if not isinstance(body, dict):
+            raise HTTPException(status_code=400, detail="JSON payload must be an object")
+        verify_token_from_request(body, authorization)
+
+        prompt = str(body.get("prompt", "") or body.get("caption", "") or "").strip()
+        lyrics = str(body.get("lyrics", "") or "").strip()
+
+        if not prompt and not lyrics:
+            return _wrap_response(None, code=400, error="Missing 'prompt' and/or 'lyrics'. Provide at least one.")
+
+        temperature = _to_float(body.get("temperature"), 0.85)
+        top_k_val = _to_int(body.get("top_k"))
+        top_p_val = _to_float(body.get("top_p"))
+        repetition_penalty = _to_float(body.get("repetition_penalty"), 1.0)
+        seed = _to_int(body.get("seed"))
+
+        # Normalize sampling params
+        top_k = top_k_val if top_k_val and top_k_val > 0 else None
+        top_p = top_p_val if top_p_val and top_p_val < 1.0 else None
+
+        # Set random seed if requested
+        if seed is not None and seed >= 0:
+            import torch
+            torch.manual_seed(seed)
+            random.seed(seed)
+
+        # Parse optional metadata constraints
+        user_metadata = {}
+        bpm = _to_int(body.get("bpm"))
+        if bpm is not None and bpm > 0:
+            user_metadata['bpm'] = bpm
+        duration = _to_float(body.get("duration"))
+        if duration is not None and duration > 0:
+            user_metadata['duration'] = int(duration)
+        key_scale = str(body.get("key_scale", "") or body.get("keyscale", "") or "").strip()
+        if key_scale:
+            user_metadata['keyscale'] = key_scale
+        time_signature = str(body.get("time_signature", "") or body.get("timesignature", "") or "").strip()
+        if time_signature:
+            user_metadata['timesignature'] = time_signature
+        language = str(body.get("vocal_language", "") or body.get("language", "") or "").strip()
+        if language and language != "unknown":
+            user_metadata['language'] = language
+
+        try:
+            llm = _ensure_llm_for_endpoint()
+
+            result = format_sample(
+                llm_handler=llm,
+                caption=prompt,
+                lyrics=lyrics,
+                user_metadata=user_metadata if user_metadata else None,
+                temperature=temperature,
+                top_k=top_k,
+                top_p=top_p,
+                repetition_penalty=repetition_penalty,
+                use_constrained_decoding=True,
+            )
+
+            if not result.success:
+                return _wrap_response(None, code=500, error=f"Format failed: {result.error or result.status_message}")
+
+            return _wrap_response({
+                "caption": result.caption,
+                "lyrics": result.lyrics,
+                "bpm": result.bpm,
+                "duration": result.duration,
+                "key_scale": result.keyscale,
+                "language": result.language,
+                "time_signature": result.timesignature,
+                "seed": seed,
+            })
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception("lm/format error")
+            return _wrap_response(None, code=500, error=f"lm/format error: {str(e)}")
 
     @app.get("/v1/audio")
     async def get_audio(path: str, request: Request, _: None = Depends(verify_api_key)):

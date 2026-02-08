@@ -11,6 +11,11 @@ This service provides an HTTP-based asynchronous music generation API.
 2. Call `POST /query_result` to batch query task status until `status` is `1` (succeeded) or `2` (failed).
 3. Download audio files via `GET /v1/audio?path=...` URLs returned in the result.
 
+**LM-Only Endpoints** (synchronous, no audio generation):
+- `POST /lm/understand` — Analyze audio and extract caption, lyrics, metadata.
+- `POST /lm/inspire` — Generate caption, lyrics, and metadata from a text description.
+- `POST /lm/format` — Enhance/rewrite caption and lyrics with full metadata.
+
 ---
 
 ## Table of Contents
@@ -27,6 +32,9 @@ This service provides an HTTP-based asynchronous music generation API.
 - [Download Audio Files](#10-download-audio-files)
 - [Health Check](#11-health-check)
 - [Environment Variables](#12-environment-variables)
+- [LM Understand Audio](#13-lm-understand-audio)
+- [LM Inspire (Text-to-Metadata)](#14-lm-inspire-text-to-metadata)
+- [LM Format (Enhance Caption/Lyrics)](#15-lm-format-enhance-captionlyrics)
 
 ---
 
@@ -704,6 +712,291 @@ The API server can be configured using environment variables:
 | `ACESTEP_TMPDIR` | `.cache/acestep/tmp` | Temporary file directory |
 | `TRITON_CACHE_DIR` | `.cache/acestep/triton` | Triton cache directory |
 | `TORCHINDUCTOR_CACHE_DIR` | `.cache/acestep/torchinductor` | TorchInductor cache directory |
+
+---
+
+## 13. LM Understand Audio
+
+### 13.1 API Definition
+
+- **URL**: `/lm/understand`
+- **Method**: `POST`
+- **Content-Type**: `multipart/form-data` or `application/json`
+
+Analyze audio and extract metadata using the 5Hz Language Model. This is the
+reverse of generation: given audio, the LM encodes it to semantic codes (via the
+DiT VAE) then generates a textual description including caption, lyrics, BPM,
+key, duration, etc.
+
+You can provide audio as:
+- A **file upload** (`multipart/form-data` with `audio`, `audio_file`, or `src_audio` field)
+- An **audio_path** string pointing to a file already on the server
+- A pre-computed **audio_codes** string (skips the VAE encoding step)
+
+This endpoint runs synchronously and returns the result directly (no async job queue).
+
+> **Note**: File upload and `audio_path` require the DiT model to be initialized
+> (it runs the VAE encoder). If you already have `audio_codes`, only the LLM is
+> needed.
+
+### 13.2 Request Parameters
+
+| Parameter Name | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `audio` / `audio_file` / `src_audio` | File | — | Audio file upload (multipart only) |
+| `audio_path` | string | — | Path to audio file on server |
+| `audio_codes` | string | — | Pre-computed 5Hz semantic code string |
+| `temperature` | float | `0.3` | LM sampling temperature |
+| `top_k` | int | null | Top-k sampling (0/null disables) |
+| `top_p` | float | null | Top-p / nucleus sampling (<1.0 to enable) |
+| `repetition_penalty` | float | `1.0` | Repetition penalty |
+| `seed` | int | null | Random seed for reproducibility |
+
+### 13.3 Response Example
+
+```json
+{
+  "data": {
+    "caption": "A mellow acoustic folk song with fingerpicked guitar and soft male vocals, evoking a warm evening atmosphere.",
+    "lyrics": "[Verse 1]\nSunshine fading through the trees\nWhispers carried on the breeze\n...",
+    "bpm": 95,
+    "duration": 180,
+    "key_scale": "G Major",
+    "language": "en",
+    "time_signature": "4",
+    "seed": 42
+  },
+  "code": 200,
+  "error": null,
+  "timestamp": 1700000000000,
+  "extra": null
+}
+```
+
+### 13.4 Usage Examples (cURL)
+
+**Upload audio file**:
+
+```bash
+curl -X POST http://localhost:8001/lm/understand \
+  -F "audio=@/path/to/song.mp3" \
+  -F "temperature=0.3"
+```
+
+**With pre-computed audio codes (JSON)**:
+
+```bash
+curl -X POST http://localhost:8001/lm/understand \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "audio_codes": "<your-audio-codes-string>",
+    "temperature": 0.3,
+    "seed": 42
+  }'
+```
+
+**With server-side audio path**:
+
+```bash
+curl -X POST http://localhost:8001/lm/understand \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "audio_path": "/data/songs/example.wav",
+    "temperature": 0.3
+  }'
+```
+
+---
+
+## 14. LM Inspire (Text-to-Metadata)
+
+### 14.1 API Definition
+
+- **URL**: `/lm/inspire`
+- **Method**: `POST`
+- **Content-Type**: `application/json` or `multipart/form-data`
+
+Generate caption, lyrics, and full metadata from a high-level natural language
+music description. This is the "inspiration mode" — you describe what you want
+and the LM produces everything needed for generation, without actually producing
+audio.
+
+This endpoint runs synchronously and returns the result directly.
+
+### 14.2 Request Parameters
+
+| Parameter Name | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `query` / `description` / `prompt` | string | **required** | Natural language music description (e.g., "a soft Bengali love song for a quiet evening") |
+| `instrumental` | bool | `false` | If true, generate instrumental music (no lyrics) |
+| `vocal_language` / `language` | string | null | Constrain vocal language (e.g., "en", "zh", "ja") |
+| `temperature` | float | `0.85` | LM sampling temperature |
+| `top_k` | int | null | Top-k sampling (0/null disables) |
+| `top_p` | float | null | Top-p / nucleus sampling (<1.0 to enable) |
+| `repetition_penalty` | float | `1.0` | Repetition penalty |
+| `seed` | int | null | Random seed for reproducibility |
+
+### 14.3 Response Example
+
+```json
+{
+  "data": {
+    "caption": "A gentle Bengali love ballad with sitar and tabla accompaniment, featuring tender female vocals in a slow 6/8 time signature, evoking a peaceful evening atmosphere.",
+    "lyrics": "[Verse 1]\nতোমার চোখে দেখি আকাশ\nস্বপ্নের রঙে ভরা ভালোবাসা\n...",
+    "bpm": 72,
+    "duration": 240,
+    "key_scale": "D Minor",
+    "language": "bn",
+    "time_signature": "6",
+    "instrumental": false,
+    "seed": 123
+  },
+  "code": 200,
+  "error": null,
+  "timestamp": 1700000000000,
+  "extra": null
+}
+```
+
+### 14.4 Usage Examples (cURL)
+
+**Basic inspiration**:
+
+```bash
+curl -X POST http://localhost:8001/lm/inspire \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "a soft Bengali love song for a quiet evening"
+  }'
+```
+
+**Instrumental with language constraint**:
+
+```bash
+curl -X POST http://localhost:8001/lm/inspire \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "energetic electronic dance music with heavy bass drops",
+    "instrumental": true,
+    "temperature": 0.9,
+    "seed": 42
+  }'
+```
+
+**With specific vocal language**:
+
+```bash
+curl -X POST http://localhost:8001/lm/inspire \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "upbeat pop song about summer",
+    "vocal_language": "ja",
+    "temperature": 0.85
+  }'
+```
+
+---
+
+## 15. LM Format (Enhance Caption/Lyrics)
+
+### 15.1 API Definition
+
+- **URL**: `/lm/format`
+- **Method**: `POST`
+- **Content-Type**: `application/json` or `multipart/form-data`
+
+Enhance and structure user-provided caption and/or lyrics using the 5Hz Language
+Model. The LM rewrites the caption, adds structure to lyrics (verse/chorus
+markers), and generates complete metadata (BPM, key, duration, time signature,
+language).
+
+This is useful for cleaning up rough user input before feeding it to audio
+generation, or for getting the LM's interpretation of a music description.
+
+This endpoint runs synchronously and returns the result directly.
+
+> **Note**: This endpoint is similar to `/format_input` but provides a cleaner
+> interface with direct JSON field access for metadata constraints (no
+> `param_obj` JSON-string wrapping needed).
+
+### 15.2 Request Parameters
+
+| Parameter Name | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `prompt` / `caption` | string | — | Music description / caption (at least one of `prompt` or `lyrics` required) |
+| `lyrics` | string | — | Raw lyrics text |
+| `bpm` | int | null | Constrain BPM (30-300) |
+| `duration` | float | null | Constrain duration in seconds |
+| `key_scale` / `keyscale` | string | null | Constrain key/scale (e.g., "C Major", "Am") |
+| `time_signature` / `timesignature` | string | null | Constrain time signature (2, 3, 4, 6) |
+| `vocal_language` / `language` | string | null | Constrain vocal language |
+| `temperature` | float | `0.85` | LM sampling temperature |
+| `top_k` | int | null | Top-k sampling (0/null disables) |
+| `top_p` | float | null | Top-p / nucleus sampling (<1.0 to enable) |
+| `repetition_penalty` | float | `1.0` | Repetition penalty |
+| `seed` | int | null | Random seed for reproducibility |
+
+### 15.3 Response Example
+
+```json
+{
+  "data": {
+    "caption": "An upbeat pop-rock anthem with driving electric guitars, punchy drums, and soaring male vocals, perfect for a summer road trip.",
+    "lyrics": "[Verse 1]\nWalking down the open road\nSun is shining, feel the glow\n\n[Chorus]\nWe're alive, we're on fire\nReaching for something higher\n...",
+    "bpm": 128,
+    "duration": 210,
+    "key_scale": "A Major",
+    "language": "en",
+    "time_signature": "4",
+    "seed": null
+  },
+  "code": 200,
+  "error": null,
+  "timestamp": 1700000000000,
+  "extra": null
+}
+```
+
+### 15.4 Usage Examples (cURL)
+
+**Basic format enhancement**:
+
+```bash
+curl -X POST http://localhost:8001/lm/format \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "prompt": "pop rock",
+    "lyrics": "Walking down the street\nFeeling the beat"
+  }'
+```
+
+**With metadata constraints**:
+
+```bash
+curl -X POST http://localhost:8001/lm/format \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "prompt": "jazz ballad",
+    "lyrics": "[Verse]\nMoonlight on the water\nStars above the city",
+    "bpm": 80,
+    "key_scale": "Bb Major",
+    "time_signature": "3",
+    "duration": 240,
+    "language": "en"
+  }'
+```
+
+**Caption only (no lyrics)**:
+
+```bash
+curl -X POST http://localhost:8001/lm/format \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "caption": "aggressive death metal with blast beats and guttural vocals",
+    "temperature": 0.7,
+    "seed": 99
+  }'
+```
 
 ---
 
