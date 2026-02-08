@@ -861,7 +861,67 @@ class RequestParser:
         return _to_bool(self.get(name), default)
 
 
+# ---------------------------------------------------------------------------
+# Audio file validation
+# ---------------------------------------------------------------------------
+ALLOWED_AUDIO_EXTENSIONS = {
+    ".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".aac", ".wma", ".aiff", ".aif",
+}
+ALLOWED_AUDIO_MIMETYPES = {
+    "audio/wav", "audio/x-wav", "audio/wave",
+    "audio/mpeg", "audio/mp3",
+    "audio/flac", "audio/x-flac",
+    "audio/ogg", "audio/opus",
+    "audio/mp4", "audio/x-m4a", "audio/aac", "audio/x-aac",
+    "audio/x-ms-wma",
+    "audio/aiff", "audio/x-aiff",
+    # Some clients send generic binary type — we allow it only if the extension is valid
+    "application/octet-stream",
+}
+
+
+def _validate_audio_upload(upload: StarletteUploadFile) -> None:
+    """Validate that an uploaded file looks like a supported audio file.
+
+    Raises ``HTTPException(400)`` when the file fails validation.
+    """
+    filename = upload.filename or ""
+    ext = Path(filename).suffix.lower()
+
+    if ext and ext not in ALLOWED_AUDIO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported audio file extension '{ext}'. "
+                f"Allowed extensions: {', '.join(sorted(ALLOWED_AUDIO_EXTENSIONS))}"
+            ),
+        )
+
+    content_type = (upload.content_type or "").lower().split(";")[0].strip()
+    if content_type and content_type not in ALLOWED_AUDIO_MIMETYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported audio MIME type '{content_type}'. "
+                f"Please upload a valid audio file (WAV, MP3, FLAC, OGG, etc.)."
+            ),
+        )
+
+    # If the MIME type is the generic octet-stream, require a valid extension
+    if content_type == "application/octet-stream" and ext not in ALLOWED_AUDIO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Cannot determine file type: MIME type is '{content_type}' and extension "
+                f"'{ext}' is not a recognised audio format. "
+                f"Allowed extensions: {', '.join(sorted(ALLOWED_AUDIO_EXTENSIONS))}"
+            ),
+        )
+
+
 async def _save_upload_to_temp(upload: StarletteUploadFile, *, prefix: str) -> str:
+    _validate_audio_upload(upload)
+
     suffix = Path(upload.filename or "").suffix
     fd, path = tempfile.mkstemp(prefix=f"{prefix}_", suffix=suffix)
     os.close(fd)
